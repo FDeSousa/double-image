@@ -62,15 +62,29 @@ body {
     margin: 0;
 }
 
-/* Remove individual margin from buttons as gap is used in .controls */
 .controls button {
-    padding: 10px 15px; /* Standardized padding for height */
+    padding: 0 10px; /* Adjusted padding, height will control vertical space */
     cursor: pointer;
-    min-width: 120px; /* Minimum width for buttons */
+    width: 160px; /* Fixed width */
+    height: 50px; /* Explicit height - adjust as needed */
     text-align: center;
-    flex-grow: 1; /* Allow buttons to grow if space allows, for more uniformity */
-    /* If you want truly identical widths, you might need to set a fixed width or use more complex flex/grid */
+    box-sizing: border-box;
+    display: flex; /* Enable flex for centering content */
+    align-items: center; /* Vertically center content */
+    justify-content: center; /* Horizontally center content */
+    line-height: 1.2; /* Adjust for multi-line text if necessary */
+    border: 1px solid #ccc; /* Default browser button border can vary */
+    background-color: #f0f0f0; /* Default browser button bg can vary */
+    color: #333; /* Default browser button text color */
+    /* Remove any browser-default appearance that might interfere */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
 }
+.controls button:hover {
+    background-color: #e0e0e0; /* Simple hover effect */
+}
+
 
 /* Specific styling for the file input button to make it behave like others */
 #loadTemplateBtn {
@@ -80,7 +94,6 @@ body {
 #drawingArea {
     position: relative;
     border: 1px solid black;
-    /* Define dimensions or let the template image define them */
     width: 500px; /* Example width */
     height: 400px; /* Example height */
     margin-bottom: 20px;
@@ -92,10 +105,10 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    object-fit: contain; /* Or 'cover', 'fill' depending on desired behavior */
+    object-fit: contain;
     z-index: 1;
-    pointer-events: none; /* Make sure it doesn't interfere with canvas events */
-    opacity: 0.3; /* Make template semi-transparent */
+    pointer-events: none;
+    opacity: 0.3;
 }
 
 #drawingCanvas {
@@ -105,69 +118,52 @@ body {
     width: 100%;
     height: 100%;
     cursor: crosshair;
-    z-index: 2; /* Ensure canvas is on top */
-    touch-action: none; /* Prevent default touch actions like scrolling */
+    z-index: 2;
+    touch-action: none;
 }
-
-/* Removed styles for #resultsArea */
 
 #comparisonArea {
     margin-top: 20px;
     width: 100%;
-    max-width: 800px; /* Adjust as needed */
+    max-width: 800px;
     display: flex;
-    flex-wrap: wrap; /* Allow wrapping on smaller screens */
-    justify-content: space-around; /* Distribute items */
+    flex-wrap: wrap;
+    justify-content: space-around;
     align-items: flex-start;
     border: 1px solid #ccc;
     padding: 10px;
-    flex-direction: column; /* Stack comparison sets vertically */
+    flex-direction: column;
 }
 
-.comparison-header-row { /* New style for the header row */
+.comparison-header-row {
     width: 100%;
     display: flex;
-    justify-content: space-between; /* Space out H2 and average */
+    justify-content: space-between;
     align-items: center;
     margin-bottom: 15px;
-    padding: 0 10px; /* Add some padding if needed */
+    padding: 0 10px;
     box-sizing: border-box;
 }
 
-#comparisonArea h2 { /* Adjust H2 within the flex row */
-    margin: 0; /* Remove default margins */
-    text-align: left; /* Align to the left */
+#comparisonArea h2 {
+    margin: 0;
+    text-align: left;
 }
 
-#overallAverageContainer { /* Adjust container within the flex row */
-    margin: 0; /* Remove default margins */
-    text-align: right; /* Align to the right */
+#overallAverageContainer {
+    margin: 0;
+    text-align: right;
 }
 
 #overallAverageContainer p {
-    margin: 0; /* Remove default paragraph margin */
-}
-
-.comparison-set-group {
-    display: flex;
-    flex-direction: column; /* Stack comparison groups vertically */
-    justify-content: space-around;
-    align-items: flex-start;
-    width: 100%;
-}
-
-.result-set-comparison-container {
-    display: flex;
-    flex-direction: row; /* Stack result sets vertically */
-    align-items: center; /* Center align items */
-    width: 100%;
+    margin: 0;
 }
 
 .comparison-set {
     width: 100%;
     display: flex;
-    flex-direction: column; /* h3 above the row of containers */
-    align-items: center; /* Center the h3 and the row div */
+    flex-direction: column;
+    align-items: center;
     border-bottom: 1px dashed #ddd;
     padding-bottom: 10px;
     margin-bottom: 10px;
@@ -176,21 +172,25 @@ body {
     border-bottom: none;
     margin-bottom: 0;
 }
-.comparison-set h3 {
-    text-align: center;
-    margin-top: 0;
-    margin-bottom: 10px;
-}
 
-.comparison-set-title-row {
+/* Styles for ComparisonSet.vue header row */
+.comparison-set-header-row {
     width: 100%;
     display: flex;
-    flex-direction: row; /* Align title and row of containers */
-    justify-content: space-evenly; /* Center the title */
+    justify-content: space-between;
     align-items: center;
+    margin-bottom: 10px;
+    padding: 0 5px;
+    box-sizing: border-box;
+    font-weight: bold;
+}
+.comparison-set-header-row h3,
+.comparison-set-header-row p {
+    margin: 0;
 }
 
-.comparison-set-row { /* New class for the row of three containers */
+
+.comparison-set-row {
     width: 100%;
     display: flex;
     flex-direction: row;
@@ -198,22 +198,20 @@ body {
     align-items: flex-start;
 }
 
-
 .comparison-container {
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin: 0 5px; /* Reduced margin for side-by-side */
+    margin: 0 5px;
     text-align: center;
-    flex: 1; /* Allow containers to grow and shrink */
-    min-width: 160px; /* Prevent containers from becoming too small */
+    flex: 1;
+    min-width: 160px;
 }
 
 .comparison-container canvas {
     border: 1px solid #eee;
-    /* Make overlay canvases smaller than main drawing area */
-    width: 200px; /* Example width */
-    height: 150px; /* Example height */
+    width: 200px;
+    height: 150px;
     margin-bottom: 5px;
 }
 
@@ -225,45 +223,51 @@ body {
 /* Responsive Design for smaller screens */
 @media (max-width: 768px) {
     .controls {
-        flex-direction: column; /* Stack controls vertically */
-        align-items: stretch; /* Make control buttons full width */
+        flex-direction: column;
+        align-items: stretch;
     }
 
     .controls button, 
-    #predefinedThumbnailsContainer { /* Ensure thumbnail container also behaves well */
-        width: 100%; /* Make them take full width of the controls area */
+    #predefinedThumbnailsContainer {
+        width: 100%; /* Make them take full width of the controls area when stacked */
         margin-left: 0;
         margin-right: 0;
     }
     
     #predefinedThumbnailsContainer {
-        justify-content: flex-start; /* Align thumbnails to the start */
+        justify-content: flex-start;
     }
 
     .comparison-set-row {
-        flex-direction: column; /* Stack comparison containers vertically */
-        align-items: center; /* Center them when stacked */
+        flex-direction: column;
+        align-items: center;
     }
 
     .comparison-container {
-        min-width: 80%; /* Allow them to take more width when stacked */
-        margin-bottom: 15px; /* Add space between stacked containers */
+        min-width: 80%;
+        margin-bottom: 15px;
     }
 
-    .comparison-header-row {
+    .comparison-header-row { /* For the main comparison area header */
         flex-direction: column;
         align-items: center;
         gap: 5px;
     }
     #comparisonArea h2,
     #overallAverageContainer {
-        text-align: center; /* Center text when stacked */
+        text-align: center;
+    }
+
+    .comparison-set-header-row { /* For individual set headers */
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
     }
 }
 
 @media (max-width: 480px) {
     .comparison-container canvas {
-        width: 150px; /* Smaller canvases on very small screens */
+        width: 150px;
         height: 112px;
     }
     .comparison-container {
