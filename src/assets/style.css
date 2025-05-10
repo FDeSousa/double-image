@@ -1,0 +1,272 @@
+body {
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+}
+
+.subtitle {
+    font-size: 0.9em;
+    color: #555;
+    margin-top: -10px; /* Adjust to bring it closer to h1 */
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.controls {
+    margin-bottom: 20px;
+    display: flex; /* Add flexbox for alignment */
+    flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
+    gap: 5px; /* Add gap between buttons/elements */
+    align-items: center; /* Vertically align items in the row */
+}
+
+#predefinedThumbnailsContainer {
+    display: flex; /* Will be toggled by JS */
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid #eee;
+    margin-top: 10px;
+    margin-bottom: 10px; /* Add some space below the container */
+    max-width: 100%; /* Ensure it doesn't overflow .controls */
+}
+
+.thumbnail-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    border: 1px solid transparent; /* For hover effect */
+    padding: 5px;
+}
+
+.thumbnail-item:hover {
+    border-color: #ccc;
+    background-color: #f9f9f9;
+}
+
+.template-thumbnail {
+    width: 100px; /* Adjust as needed */
+    height: 75px;  /* Adjust as needed */
+    object-fit: contain;
+    border: 1px solid #ddd;
+    margin-bottom: 5px;
+}
+
+.thumbnail-name {
+    font-size: 0.8em;
+    text-align: center;
+    margin: 0;
+}
+
+/* Remove individual margin from buttons as gap is used in .controls */
+.controls button {
+    padding: 10px 15px; /* Standardized padding for height */
+    cursor: pointer;
+    min-width: 120px; /* Minimum width for buttons */
+    text-align: center;
+    flex-grow: 1; /* Allow buttons to grow if space allows, for more uniformity */
+    /* If you want truly identical widths, you might need to set a fixed width or use more complex flex/grid */
+}
+
+/* Specific styling for the file input button to make it behave like others */
+#loadTemplateBtn {
+    /* Add any specific overrides if needed, but general button style should cover it */
+}
+
+#drawingArea {
+    position: relative;
+    border: 1px solid black;
+    /* Define dimensions or let the template image define them */
+    width: 500px; /* Example width */
+    height: 400px; /* Example height */
+    margin-bottom: 20px;
+}
+
+#templateImage {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* Or 'cover', 'fill' depending on desired behavior */
+    z-index: 1;
+    pointer-events: none; /* Make sure it doesn't interfere with canvas events */
+    opacity: 0.3; /* Make template semi-transparent */
+}
+
+#drawingCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+    z-index: 2; /* Ensure canvas is on top */
+    touch-action: none; /* Prevent default touch actions like scrolling */
+}
+
+/* Removed styles for #resultsArea */
+
+#comparisonArea {
+    margin-top: 20px;
+    width: 100%;
+    max-width: 800px; /* Adjust as needed */
+    display: flex;
+    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+    justify-content: space-around; /* Distribute items */
+    align-items: flex-start;
+    border: 1px solid #ccc;
+    padding: 10px;
+    flex-direction: column; /* Stack comparison sets vertically */
+}
+
+.comparison-header-row { /* New style for the header row */
+    width: 100%;
+    display: flex;
+    justify-content: space-between; /* Space out H2 and average */
+    align-items: center;
+    margin-bottom: 15px;
+    padding: 0 10px; /* Add some padding if needed */
+    box-sizing: border-box;
+}
+
+#comparisonArea h2 { /* Adjust H2 within the flex row */
+    margin: 0; /* Remove default margins */
+    text-align: left; /* Align to the left */
+}
+
+#overallAverageContainer { /* Adjust container within the flex row */
+    margin: 0; /* Remove default margins */
+    text-align: right; /* Align to the right */
+}
+
+#overallAverageContainer p {
+    margin: 0; /* Remove default paragraph margin */
+}
+
+.comparison-set-group {
+    display: flex;
+    flex-direction: column; /* Stack comparison groups vertically */
+    justify-content: space-around;
+    align-items: flex-start;
+    width: 100%;
+}
+
+.result-set-comparison-container {
+    display: flex;
+    flex-direction: row; /* Stack result sets vertically */
+    align-items: center; /* Center align items */
+    width: 100%;
+}
+
+.comparison-set {
+    width: 100%;
+    display: flex;
+    flex-direction: column; /* h3 above the row of containers */
+    align-items: center; /* Center the h3 and the row div */
+    border-bottom: 1px dashed #ddd;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+}
+.comparison-set:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+.comparison-set h3 {
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+.comparison-set-title-row {
+    width: 100%;
+    display: flex;
+    flex-direction: row; /* Align title and row of containers */
+    justify-content: space-evenly; /* Center the title */
+    align-items: center;
+}
+
+.comparison-set-row { /* New class for the row of three containers */
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: flex-start;
+}
+
+
+.comparison-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0 5px; /* Reduced margin for side-by-side */
+    text-align: center;
+    flex: 1; /* Allow containers to grow and shrink */
+    min-width: 160px; /* Prevent containers from becoming too small */
+}
+
+.comparison-container canvas {
+    border: 1px solid #eee;
+    /* Make overlay canvases smaller than main drawing area */
+    width: 200px; /* Example width */
+    height: 150px; /* Example height */
+    margin-bottom: 5px;
+}
+
+.comparison-container p {
+    font-size: 0.9em;
+    margin: 0;
+}
+
+/* Responsive Design for smaller screens */
+@media (max-width: 768px) {
+    .controls {
+        flex-direction: column; /* Stack controls vertically */
+        align-items: stretch; /* Make control buttons full width */
+    }
+
+    .controls button, 
+    #predefinedThumbnailsContainer { /* Ensure thumbnail container also behaves well */
+        width: 100%; /* Make them take full width of the controls area */
+        margin-left: 0;
+        margin-right: 0;
+    }
+    
+    #predefinedThumbnailsContainer {
+        justify-content: flex-start; /* Align thumbnails to the start */
+    }
+
+    .comparison-set-row {
+        flex-direction: column; /* Stack comparison containers vertically */
+        align-items: center; /* Center them when stacked */
+    }
+
+    .comparison-container {
+        min-width: 80%; /* Allow them to take more width when stacked */
+        margin-bottom: 15px; /* Add space between stacked containers */
+    }
+
+    .comparison-header-row {
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+    }
+    #comparisonArea h2,
+    #overallAverageContainer {
+        text-align: center; /* Center text when stacked */
+    }
+}
+
+@media (max-width: 480px) {
+    .comparison-container canvas {
+        width: 150px; /* Smaller canvases on very small screens */
+        height: 112px;
+    }
+    .comparison-container {
+        min-width: 95%;
+    }
+}
