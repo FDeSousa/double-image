@@ -1,4 +1,10 @@
 <template>
+  <TopNavbar 
+    :currentTheme="currentTheme"
+    :canClearAll="allComparisonResults.length > 0"
+    @toggle-theme="toggleTheme"
+    @clear-all-results="handleClearAllResults"
+  />
   <div id="app-container">
     <h1>On the other hand</h1>
     <p class="subtitle">Try drawing with both hands! Can you be a two-hand artist?</p>
@@ -33,7 +39,8 @@
 
 <script setup>
 // Script setup for Vue 3 Composition API
-import { ref, onMounted } from 'vue'; // Added onMounted
+import { ref, onMounted } from 'vue'; 
+import TopNavbar from './components/TopNavbar.vue'; // New import
 import AppControls from './components/AppControls.vue';
 import ThumbnailPicker from './components/ThumbnailPicker.vue';
 import DrawingCanvas from './components/DrawingCanvas.vue';
@@ -325,10 +332,11 @@ onMounted(() => {
 <style>
 /* Styles from style.css are now global. 
    App-specific or scoped styles can be added here if needed. */
-#app-container { /* Changed from #app to avoid conflict if #app is used by Vue internally on body */
+#app-container { 
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* padding: 20px; /* This is in body style.css, so might not be needed here */
+  padding-top: 70px; /* Add padding to account for fixed navbar height + some space */
+  /* padding: 20px; /* Original padding, now handled by body and adjusted here */
 }
 </style>

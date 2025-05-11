@@ -4,15 +4,14 @@
     <input type="file" id="templateInput" ref="templateFileInputRef" @change="handleFileSelected" accept="image/*" style="display: none;">
     <button id="pickPredefinedBtn" v-if="props.currentStage === 'initial' || props.currentStage === 'compared'" @click="toggleThumbnails">Pick one of ours</button>
     
-    <button id="clearBtn" v-if="props.currentStage === 'drawing1' || props.currentStage === 'drawing2'" @click="clearDrawing">Clear drawing</button>
-    
     <button id="save1Btn" v-if="props.currentStage === 'drawing1'" @click="emit('save-drawing-1')">Save first drawing</button>
     <button id="start2Btn" v-if="props.currentStage === 'readyForDrawing2'" @click="emit('start-drawing-2')">Start second drawing</button>
     <button id="save2Btn" v-if="props.currentStage === 'drawing2'" @click="emit('save-drawing-2')">Save second drawing & compare</button>
     
-    <button id="restartBtn" v-if="['drawing1', 'readyForDrawing2', 'drawing2', 'compared'].includes(props.currentStage)" @click="emit('restart-process')">Restart this drawing pair</button>
-    <button id="clearAllBtn" v-if="props.canClearAll" @click="emit('clear-all-results')">Clear all saved results</button>
-    <button id="toggleThemeBtn" @click="emit('toggle-theme')">Toggle Theme</button>
+    <button id="clearBtn" v-if="props.currentStage === 'drawing1' || props.currentStage === 'drawing2'" @click="clearDrawing">Clear drawing</button>
+    
+    <button id="restartBtn" v-if="['drawing1', 'readyForDrawing2', 'drawing2'].includes(props.currentStage)" @click="emit('restart-process')">Restart this drawing pair</button>
+    <!-- "Clear all saved results" and "Toggle Theme" buttons moved to TopNavbar.vue -->
   </div>
 </template>
 
@@ -35,9 +34,9 @@ const emit = defineEmits([
   'start-drawing-2', 
   'save-drawing-2',
   'restart-process',
-  'clear-all-results',
-  'template-file-selected',
-  'toggle-theme' // New event
+  // 'clear-all-results', // Handled by TopNavbar
+  'template-file-selected'
+  // 'toggle-theme' // Handled by TopNavbar
 ]);
 
 const templateFileInputRef = ref(null);
