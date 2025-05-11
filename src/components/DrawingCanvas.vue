@@ -1,6 +1,13 @@
 <template>
   <div id="drawingArea">
-    <img id="templateImage" :src="templateSrc" alt="Template Image" v-if="templateSrc" :style="{ opacity: 0.3, display: templateSrc ? 'block' : 'none' }">
+    <img 
+      id="templateImage" 
+      v-if="templateSrc" 
+      :key="templateSrc" 
+      :src="templateSrc" 
+      alt="Template Image" 
+      style="opacity: 0.3;"
+    >
     <canvas id="drawingCanvas" ref="drawingCanvasRef"></canvas>
   </div>
 </template>

@@ -12,6 +12,7 @@
       @restart-process="handleRestartProcess"
       @clear-all-results="handleClearAllResults"
       @template-file-selected="handleTemplateFileSelected"
+      @toggle-theme="toggleTheme"
       :currentStage="stage" 
       :canClearAll="allComparisonResults.length > 0"
     />
@@ -42,10 +43,11 @@ const thumbnailPickerVisible = ref(false);
 const currentTemplateSrc = ref(null);
 const drawingCanvasComponentRef = ref(null);
 const stage = ref('initial'); // initial, drawing1, readyForDrawing2, drawing2, compared
-const allComparisonResults = ref([]); // Placeholder for now
+const allComparisonResults = ref([]); 
 const drawing1DataURL = ref(null);
 // eslint-disable-next-line no-unused-vars
-const drawing2DataURL = ref(null); // Will be used later
+const drawing2DataURL = ref(null); 
+const currentTheme = ref('light'); // 'light' or 'dark'
 
 function handleToggleThumbnails() {
   thumbnailPickerVisible.value = !thumbnailPickerVisible.value;
@@ -273,12 +275,48 @@ function loadResultsFromLocalStorage() {
     }
   } catch (e) {
     console.error("Error loading results from localStorage:", e);
-    allComparisonResults.value = []; // Reset if loading fails
+    allComparisonResults.value = []; 
+  }
+}
+
+const THEME_STORAGE_KEY = 'doubleImageVueTheme';
+
+function applyTheme(theme) {
+  if (theme === 'dark') {
+    document.body.classList.add('dark-mode');
+  } else {
+    document.body.classList.remove('dark-mode');
+  }
+  currentTheme.value = theme;
+}
+
+function toggleTheme() {
+  const newTheme = currentTheme.value === 'light' ? 'dark' : 'light';
+  applyTheme(newTheme);
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, newTheme);
+  } catch (e) {
+    console.error("Error saving theme to localStorage:", e);
+  }
+}
+
+function loadThemeFromLocalStorage() {
+  try {
+    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    if (savedTheme) {
+      applyTheme(savedTheme);
+    } else {
+      applyTheme('light'); // Default to light theme
+    }
+  } catch (e) {
+    console.error("Error loading theme from localStorage:", e);
+    applyTheme('light'); // Default on error
   }
 }
 
 onMounted(() => {
   loadResultsFromLocalStorage();
+  loadThemeFromLocalStorage();
 });
 
 // We will add imports and logic here as we build components

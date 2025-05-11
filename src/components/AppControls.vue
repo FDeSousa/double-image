@@ -12,6 +12,7 @@
     
     <button id="restartBtn" v-if="['drawing1', 'readyForDrawing2', 'drawing2', 'compared'].includes(props.currentStage)" @click="emit('restart-process')">Restart this drawing pair</button>
     <button id="clearAllBtn" v-if="props.canClearAll" @click="emit('clear-all-results')">Clear all saved results</button>
+    <button id="toggleThemeBtn" @click="emit('toggle-theme')">Toggle Theme</button>
   </div>
 </template>
 
@@ -35,7 +36,8 @@ const emit = defineEmits([
   'save-drawing-2',
   'restart-process',
   'clear-all-results',
-  'template-file-selected' // New event
+  'template-file-selected',
+  'toggle-theme' // New event
 ]);
 
 const templateFileInputRef = ref(null);
