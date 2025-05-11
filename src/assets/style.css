@@ -272,6 +272,23 @@ body.dark-mode .comparison-set-header-row {
     /* color already inherited from body.dark-mode */
 }
 
+/* Enhanced Focus Styles */
+*:focus-visible {
+  outline: 3px solid var(--text-color-light);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px rgba(0, 123, 255, 0.25); /* Optional softer glow */
+}
+
+body.dark-mode *:focus-visible {
+  outline: 3px solid var(--text-color-dark);
+  box-shadow: 0 0 0 5px rgba(236, 240, 241, 0.25); /* Lighter glow for dark mode */
+}
+/* Ensure high contrast for focus on specific elements if needed */
+body.dark-mode .controls button:focus-visible,
+body.dark-mode .top-navbar button:focus-visible {
+    outline-color: var(--button-text-dark); /* Ensure focus is visible on dark buttons */
+}
+
 
 .comparison-set-row {
     width: 100%;

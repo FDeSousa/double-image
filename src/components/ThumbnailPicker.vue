@@ -6,7 +6,7 @@
       class="thumbnail-item"
       @click="selectTemplate(templateFile.filename)"
     >
-      <img :src="`/template_images/${templateFile.filename}`" :alt="templateFile.name" class="template-thumbnail">
+      <img :src="`/template_images/${templateFile.filename}`" :alt="`Template: ${templateFile.name}`" class="template-thumbnail">
       <p class="thumbnail-name">{{ templateFile.name }}</p>
     </div>
   </div>

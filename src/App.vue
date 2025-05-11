@@ -5,7 +5,7 @@
     @toggle-theme="toggleTheme"
     @clear-all-results="handleClearAllResults"
   />
-  <div id="app-container">
+  <div id="app-container" role="main">
     <!-- <h1>On the other hand</h1> Main title is now in TopNavbar -->
     <!-- <p class="subtitle">Try drawing with both hands! Can you be a two-hand artist?</p> Subtitle removed -->
 
@@ -34,10 +34,18 @@
     />
 
     <div v-if="stage === 'compared' && latestComparisonScores" class="main-canvas-results">
-      <h3>Latest Comparison Scores:</h3>
-      <p>Drawing 1 vs Template: {{ latestComparisonScores.sim1vsT }}%</p>
-      <p>Drawing 2 vs Template: {{ latestComparisonScores.sim2vsT }}%</p>
-      <p>Drawing 1 vs Drawing 2: {{ latestComparisonScores.sim1vs2 }}%</p>
+      <div class="scores-layout">
+        <div class="individual-scores">
+          <h3>Latest Comparison Scores:</h3>
+          <p>Drawing 1 vs Drawing 2: {{ latestComparisonScores.sim1vs2 }}%</p>
+          <p>Drawing 1 vs Template: {{ latestComparisonScores.sim1vsT }}%</p>
+          <p>Drawing 2 vs Template: {{ latestComparisonScores.sim2vsT }}%</p>
+        </div>
+        <div class="average-score">
+          <h4>Average:</h4>
+          <p>{{ latestScoresAverage }}%</p>
+        </div>
+      </div>
       
       <div class="layer-controls">
         <h4>Display Layers on Main Canvas:</h4>
@@ -59,7 +67,7 @@
 
 <script setup>
 // Script setup for Vue 3 Composition API
-import { ref, onMounted, watch } from 'vue'; // Added watch
+import { ref, onMounted, watch, computed } from 'vue'; // Added watch and computed
 import TopNavbar from './components/TopNavbar.vue'; 
 import AppControls from './components/AppControls.vue';
 import ThumbnailPicker from './components/ThumbnailPicker.vue';
@@ -81,6 +89,13 @@ const latestComparisonScores = ref(null); // To store scores for display under m
 const showTemplateLayer = ref(true);
 const showDrawing1Layer = ref(true);
 const showDrawing2Layer = ref(true);
+
+const latestScoresAverage = computed(() => {
+  if (!latestComparisonScores.value) return 0;
+  const scores = latestComparisonScores.value;
+  const avg = ((parseFloat(scores.sim1vs2) || 0) + (parseFloat(scores.sim1vsT) || 0) + (parseFloat(scores.sim2vsT) || 0)) / 3;
+  return avg.toFixed(2);
+});
 
 function handleToggleThumbnails() {
   thumbnailPickerVisible.value = !thumbnailPickerVisible.value;
@@ -392,9 +407,36 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 70px; /* Add padding to account for fixed navbar height + some space */
+  padding-top: 55px; /* Reduced padding: navbar height (~40-45px) + ~10px space */
   /* padding: 20px; /* Original padding, now handled by body and adjusted here */
 }
+
+.scores-layout {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start; /* Align items to the top */
+  margin-bottom: 15px; /* Space before layer controls */
+}
+
+.individual-scores {
+  flex-grow: 1;
+}
+
+.average-score {
+  text-align: right;
+  padding-left: 20px; /* Space between individual scores and average */
+  min-width: 100px; /* Ensure it has some width */
+}
+.average-score h4 {
+  margin-top: 0;
+  margin-bottom: 5px;
+}
+.average-score p {
+  font-size: 1.2em;
+  font-weight: bold;
+  margin: 0;
+}
+
 
 .main-canvas-results {
   margin-top: 15px;

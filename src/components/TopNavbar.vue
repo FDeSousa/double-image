@@ -5,8 +5,9 @@
       <button 
         @click="emit('toggle-theme')" 
         class="theme-toggle-btn"
-        :aria-label="`Toggle to ${props.currentTheme === 'light' ? 'dark' : 'light'} mode`"
-        :title="`Toggle to ${props.currentTheme === 'light' ? 'dark' : 'light'} mode`"
+        :aria-label="props.currentTheme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'"
+        :title="props.currentTheme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'"
+        :aria-pressed="props.currentTheme === 'dark'"
       >
         <span v-if="props.currentTheme === 'light'">☀️</span>
         <span v-else>🌙</span>
@@ -15,8 +16,8 @@
         v-if="props.canClearAll" 
         @click="emit('clear-all-results')" 
         class="clear-all-btn"
-        aria-label="Clear all saved results"
-        title="Clear all saved results"
+        aria-label="Clear all saved comparison results"
+        title="Clear all saved comparison results"
       >
         🗑️
       </button>
