@@ -1,23 +1,26 @@
 <template>
   <nav class="top-navbar">
-    <button 
-      @click="emit('toggle-theme')" 
-      class="theme-toggle-btn"
-      :aria-label="`Toggle to ${props.currentTheme === 'light' ? 'dark' : 'light'} mode`"
-      :title="`Toggle to ${props.currentTheme === 'light' ? 'dark' : 'light'} mode`"
-    >
-      <span v-if="props.currentTheme === 'light'">☀️</span>
-      <span v-else>🌙</span>
-    </button>
-    <button 
-      v-if="props.canClearAll" 
-      @click="emit('clear-all-results')" 
-      class="clear-all-btn"
-      aria-label="Clear all saved results"
-      title="Clear all saved results"
-    >
-      🗑️
-    </button>
+    <h1 class="navbar-title">On the other hand</h1>
+    <div class="navbar-actions">
+      <button 
+        @click="emit('toggle-theme')" 
+        class="theme-toggle-btn"
+        :aria-label="`Toggle to ${props.currentTheme === 'light' ? 'dark' : 'light'} mode`"
+        :title="`Toggle to ${props.currentTheme === 'light' ? 'dark' : 'light'} mode`"
+      >
+        <span v-if="props.currentTheme === 'light'">☀️</span>
+        <span v-else>🌙</span>
+      </button>
+      <button 
+        v-if="props.canClearAll" 
+        @click="emit('clear-all-results')" 
+        class="clear-all-btn"
+        aria-label="Clear all saved results"
+        title="Clear all saved results"
+      >
+        🗑️
+      </button>
+    </div>
   </nav>
 </template>
 
@@ -39,11 +42,27 @@ const emit = defineEmits(['toggle-theme', 'clear-all-results']);
   left: 0;
   width: 100%;
   background-color: var(--button-bg-light); /* Use theme variables */
-  padding: 8px 15px;
+  padding: 8px 15px; /* Adjusted padding for better balance */
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  z-index: 1000; /* Ensure it's above other content */
+  z-index: 1000; 
   display: flex;
-  justify-content: flex-end; /* Align buttons to the right */
+  justify-content: space-between; /* Space out title and actions */
+  align-items: center;
+  box-sizing: border-box; /* Ensure padding is included in width calculation */
+}
+
+.navbar-title {
+  font-size: 1.5em;
+  margin: 0;
+  color: var(--header-color-light);
+}
+
+body.dark-mode .navbar-title {
+  color: var(--header-color-dark);
+}
+
+.navbar-actions {
+  display: flex;
   gap: 10px;
 }
 
@@ -52,7 +71,7 @@ body.dark-mode .top-navbar {
   box-shadow: 0 2px 4px rgba(255,255,255,0.05);
 }
 
-.top-navbar button {
+.top-navbar button { /* Applies to buttons within .navbar-actions implicitly */
   background: none;
   border: 1px solid transparent; /* Make border transparent initially */
   color: var(--button-text-light);

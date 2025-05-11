@@ -2,7 +2,7 @@
   <div id="drawingArea">
     <img 
       id="templateImage" 
-      v-if="templateSrc" 
+      v-if="templateSrc && props.stage !== 'compared'" 
       :key="templateSrc" 
       :src="templateSrc" 
       alt="Template Image" 
@@ -116,7 +116,8 @@ function clearDrawingCanvas() {
 // eslint-disable-next-line no-undef
 defineExpose({
   clearDrawingCanvas,
-  getCanvasDataURL
+  getCanvasDataURL,
+  displayCombinedDrawing // Expose new method
 });
 
 function getCanvasDataURL() {
@@ -125,6 +126,78 @@ function getCanvasDataURL() {
   }
   return null;
 }
+
+// New method to display combined images
+async function displayCombinedDrawing(layers) {
+  // layers = { template: { url: '...', show: true, opacity: 0.3 }, 
+  //            drawing1: { url: '...', show: true, opacity: 0.4 }, 
+  //            drawing2: { url: '...', show: true, opacity: 0.4 } }
+  if (!ctx || !drawingCanvasRef.value) return;
+
+  // Ensure canvas is at the correct display size first
+  resizeCanvas(); // This also clears the canvas if it resizes
+
+  // Clear canvas before drawing new combined image
+  ctx.clearRect(0, 0, drawingCanvasRef.value.width, drawingCanvasRef.value.height);
+  
+  // Ensure the main drawing area (parent of canvas) has a white background via CSS
+  // The canvas itself should be transparent to allow layers to show through if needed,
+  // but for this combined view, we'll draw onto a cleared (transparent) canvas.
+
+  const loadImagePromise = (url) => new Promise((resolve, reject) => {
+    if (!url) { resolve(null); return; }
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = (err) => { console.error('Error loading image for combined display:', url, err); reject(err); };
+    img.src = url;
+  });
+
+  const drawImageWithOpacity = (image, opacity) => {
+    if (!image || !image.naturalWidth || !image.naturalHeight) return;
+    const canvas = drawingCanvasRef.value;
+    const hRatio = canvas.width / image.naturalWidth;
+    const vRatio = canvas.height / image.naturalHeight;
+    const ratio = Math.min(hRatio, vRatio);
+    const centerShift_x = (canvas.width - image.naturalWidth * ratio) / 2;
+    const centerShift_y = (canvas.height - image.naturalHeight * ratio) / 2;
+    
+    ctx.globalAlpha = opacity;
+    ctx.drawImage(image, 0, 0, image.naturalWidth, image.naturalHeight,
+                  centerShift_x, centerShift_y, image.naturalWidth * ratio, image.naturalHeight * ratio);
+    ctx.globalAlpha = 1.0; // Reset alpha
+  };
+
+  try {
+    const imagesToLoad = [];
+    if (layers.template && layers.template.show && layers.template.url) {
+      imagesToLoad.push(loadImagePromise(layers.template.url).then(img => ({ type: 'template', img, opacity: layers.template.opacity })));
+    }
+    if (layers.drawing1 && layers.drawing1.show && layers.drawing1.url) {
+      imagesToLoad.push(loadImagePromise(layers.drawing1.url).then(img => ({ type: 'drawing1', img, opacity: layers.drawing1.opacity })));
+    }
+    if (layers.drawing2 && layers.drawing2.show && layers.drawing2.url) {
+      imagesToLoad.push(loadImagePromise(layers.drawing2.url).then(img => ({ type: 'drawing2', img, opacity: layers.drawing2.opacity })));
+    }
+
+    const loadedImages = await Promise.all(imagesToLoad);
+
+    // Define a drawing order, e.g., template first, then drawing1, then drawing2
+    // This can be adjusted based on desired layering effect
+    const drawOrder = ['template', 'drawing1', 'drawing2']; 
+
+    drawOrder.forEach(type => {
+      const layer = loadedImages.find(l => l && l.type === type);
+      if (layer && layer.img) {
+        drawImageWithOpacity(layer.img, layer.opacity);
+      }
+    });
+
+  } catch (error) {
+    console.error("Error displaying combined drawing:", error);
+  }
+}
+
 </script>
 
 <style scoped>

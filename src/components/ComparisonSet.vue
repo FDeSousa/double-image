@@ -38,72 +38,69 @@ function calculateSetAverage() {
   }
 }
 
-async function drawOverlayWithURLs(targetCanvas, baseURL, overlayURL, isBaseTemplate) {
+// Draws two specified images onto a canvas, with options for styling the base image if it's a template
+async function drawPairedImages(targetCanvas, baseImageURL, overlayImageURL, isBaseImageTemplate) {
   if (!targetCanvas) return;
   const targetCtx = targetCanvas.getContext('2d');
   
-  // Use fixed dimensions for these smaller canvases for now
   targetCanvas.width = 200;
   targetCanvas.height = 150;
-  targetCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+  targetCtx.fillStyle = '#FFFFFF'; // Explicitly set white background
+  targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
 
-  const loadImagePromise = (url) => new Promise((resolve, reject) => {
-    if (!url) { resolve(null); return; }
+  const loadImagePromise = (url) => new Promise((resolve) => { 
+    if (!url) { resolve(null); return; } 
     const img = new Image();
     img.crossOrigin = 'Anonymous';
     img.onload = () => resolve(img);
-    img.onerror = (err) => { console.error('Error loading image in ComparisonSet:', url, err); reject(err); };
+    img.onerror = (err) => { console.error('Error loading image in ComparisonSet:', url, err); resolve(null); };
     img.src = url;
   });
 
-  try {
-    const [baseImg, overlayImg] = await Promise.all([loadImagePromise(baseURL), loadImagePromise(overlayURL)]);
+  const drawImageContain = (image, isBase, isTemplate) => {
+    if (!image || !image.naturalWidth || !image.naturalHeight) return;
+    const hRatio = targetCanvas.width / image.naturalWidth;
+    const vRatio = targetCanvas.height / image.naturalHeight;
+    const ratio = Math.min(hRatio, vRatio);
+    const centerShift_x = (targetCanvas.width - image.naturalWidth * ratio) / 2;
+    const centerShift_y = (targetCanvas.height - image.naturalHeight * ratio) / 2;
     
-    const drawImageContain = (canvasCtxInternal, image, clear = true, isTemplateOverlay = false) => {
-        if (clear) canvasCtxInternal.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
-        if (!image || !image.naturalWidth || !image.naturalHeight) return;
+    if (isBase) {
+      targetCtx.globalAlpha = isTemplate ? 0.5 : 1.0; // Template base is more transparent
+    } else {
+      targetCtx.globalAlpha = 0.6; // Overlay image is semi-transparent
+    }
+    
+    targetCtx.drawImage(image, 0, 0, image.naturalWidth, image.naturalHeight,
+                    centerShift_x, centerShift_y, image.naturalWidth * ratio, image.naturalHeight * ratio);
+    targetCtx.globalAlpha = 1.0; // Reset alpha
+  };
 
-        const hRatio = targetCanvas.width / image.naturalWidth;
-        const vRatio = targetCanvas.height / image.naturalHeight;
-        const ratio = Math.min(hRatio, vRatio);
-        const centerShift_x = (targetCanvas.width - image.naturalWidth * ratio) / 2;
-        const centerShift_y = (targetCanvas.height - image.naturalHeight * ratio) / 2;
-        
-        canvasCtxInternal.globalAlpha = isTemplateOverlay ? (isBaseTemplate ? 0.5 : 1.0) : (isBaseTemplate && image === baseImg ? 0.5 : 0.6);
-
-
-        if (isBaseTemplate && image === baseImg) { // Base image when it's a template
-             canvasCtxInternal.globalAlpha = 0.5;
-        } else if (image === overlayImg) { // Overlay image
-            canvasCtxInternal.globalAlpha = 0.6;
-        } else { // Base image when it's not a template
-            canvasCtxInternal.globalAlpha = 1.0;
-        }
-
-
-        canvasCtxInternal.drawImage(image, 0, 0, image.naturalWidth, image.naturalHeight,
-                        centerShift_x, centerShift_y, image.naturalWidth * ratio, image.naturalHeight * ratio);
-        canvasCtxInternal.globalAlpha = 1.0; // Reset alpha
-    };
+  try {
+    const [baseImg, overlayImg] = await Promise.all([
+      loadImagePromise(baseImageURL),
+      loadImagePromise(overlayImageURL)
+    ]);
 
     if (baseImg) {
-        drawImageContain(targetCtx, baseImg, true, isBaseTemplate && baseImg === overlayImg); // Clear only for the first image
+      drawImageContain(baseImg, true, isBaseImageTemplate);
     }
-    if (overlayImg && overlayImg !== baseImg) { // Don't redraw if base and overlay are the same (e.g. template vs template)
-        drawImageContain(targetCtx, overlayImg, false, isBaseTemplate && overlayImg === baseImg);
+    if (overlayImg) {
+      drawImageContain(overlayImg, false, false); 
     }
-
-
   } catch (error) {
-    console.error("Error drawing images on comparison canvas:", error);
+    console.error("Error drawing paired images on comparison canvas:", error);
   }
 }
 
 function renderCanvases() {
-  if (props.resultSet && canvasRefs.value.length === 3) {
-    drawOverlayWithURLs(canvasRefs.value[0], props.resultSet.drawing2URL, props.resultSet.drawing1URL, false);
-    drawOverlayWithURLs(canvasRefs.value[1], props.resultSet.templateURL, props.resultSet.drawing1URL, true);
-    drawOverlayWithURLs(canvasRefs.value[2], props.resultSet.templateURL, props.resultSet.drawing2URL, true);
+  if (props.resultSet && canvasRefs.value.length === 3 && canvasRefs.value.every(c => c)) {
+    // Canvas 1: Drawing 1 (base) + Drawing 2 (overlay)
+    drawPairedImages(canvasRefs.value[0], props.resultSet.drawing1URL, props.resultSet.drawing2URL, false);
+    // Canvas 2: Template (base) + Drawing 1 (overlay)
+    drawPairedImages(canvasRefs.value[1], props.resultSet.templateURL, props.resultSet.drawing1URL, true);
+    // Canvas 3: Template (base) + Drawing 2 (overlay)
+    drawPairedImages(canvasRefs.value[2], props.resultSet.templateURL, props.resultSet.drawing2URL, true);
   }
 }
 

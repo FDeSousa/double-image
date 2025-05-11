@@ -34,13 +34,7 @@ body {
     padding: 20px;
 }
 
-.subtitle {
-    font-size: 0.9em;
-    color: var(--subtitle-color-light);
-    margin-top: -10px; /* Adjust to bring it closer to h1 */
-    margin-bottom: 20px;
-    text-align: center;
-}
+/* .subtitle rule removed */
 
 .controls {
     margin-bottom: 20px;
@@ -123,7 +117,9 @@ body.dark-mode .subtitle {
     color: var(--subtitle-color-dark);
 }
 
-body.dark-mode h1 { /* Assuming h1 is the main title */
+/* Removed body.dark-mode .subtitle */
+
+body.dark-mode h1 { /* Assuming h1 is the main title - this now applies to navbar-title if h1 tag is used there */
     color: var(--header-color-dark);
 }
 

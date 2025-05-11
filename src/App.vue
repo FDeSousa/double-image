@@ -6,8 +6,8 @@
     @clear-all-results="handleClearAllResults"
   />
   <div id="app-container">
-    <h1>On the other hand</h1>
-    <p class="subtitle">Try drawing with both hands! Can you be a two-hand artist?</p>
+    <!-- <h1>On the other hand</h1> Main title is now in TopNavbar -->
+    <!-- <p class="subtitle">Try drawing with both hands! Can you be a two-hand artist?</p> Subtitle removed -->
 
     <AppControls 
       @toggle-thumbnails="handleToggleThumbnails" 
@@ -33,14 +33,34 @@
       ref="drawingCanvasComponentRef" 
     />
 
+    <div v-if="stage === 'compared' && latestComparisonScores" class="main-canvas-results">
+      <h3>Latest Comparison Scores:</h3>
+      <p>Drawing 1 vs Template: {{ latestComparisonScores.sim1vsT }}%</p>
+      <p>Drawing 2 vs Template: {{ latestComparisonScores.sim2vsT }}%</p>
+      <p>Drawing 1 vs Drawing 2: {{ latestComparisonScores.sim1vs2 }}%</p>
+      
+      <div class="layer-controls">
+        <h4>Display Layers on Main Canvas:</h4>
+        <label>
+          <input type="checkbox" v-model="showTemplateLayer"> Template
+        </label>
+        <label>
+          <input type="checkbox" v-model="showDrawing1Layer"> Drawing 1
+        </label>
+        <label>
+          <input type="checkbox" v-model="showDrawing2Layer"> Drawing 2
+        </label>
+      </div>
+    </div>
+
     <ComparisonResults :results="allComparisonResults" />
   </div>
 </template>
 
 <script setup>
 // Script setup for Vue 3 Composition API
-import { ref, onMounted } from 'vue'; 
-import TopNavbar from './components/TopNavbar.vue'; // New import
+import { ref, onMounted, watch } from 'vue'; // Added watch
+import TopNavbar from './components/TopNavbar.vue'; 
 import AppControls from './components/AppControls.vue';
 import ThumbnailPicker from './components/ThumbnailPicker.vue';
 import DrawingCanvas from './components/DrawingCanvas.vue';
@@ -55,6 +75,12 @@ const drawing1DataURL = ref(null);
 // eslint-disable-next-line no-unused-vars
 const drawing2DataURL = ref(null); 
 const currentTheme = ref('light'); // 'light' or 'dark'
+const latestComparisonScores = ref(null); // To store scores for display under main canvas
+
+// Reactive states for layer visibility on main canvas
+const showTemplateLayer = ref(true);
+const showDrawing1Layer = ref(true);
+const showDrawing2Layer = ref(true);
 
 function handleToggleThumbnails() {
   thumbnailPickerVisible.value = !thumbnailPickerVisible.value;
@@ -208,7 +234,7 @@ async function compareAndDisplayResults() {
     console.log(`Similarity - Drawing 2 vs Template: ${sim2vsT.toFixed(2)}%`);
 
     const newComparisonSet = {
-      id: allComparisonResults.value.length, // Simple ID for now
+      id: allComparisonResults.value.length, 
       drawing1URL: drawing1DataURL.value,
       drawing2URL: drawing2DataURL.value,
       templateURL: currentTemplateSrc.value,
@@ -217,8 +243,20 @@ async function compareAndDisplayResults() {
       sim2vsT: sim2vsT,
     };
     allComparisonResults.value.push(newComparisonSet);
-    saveResultsToLocalStorage(); // Save after adding new set
-    // Overall average is a computed prop in ComparisonResults, so it will update automatically.
+    latestComparisonScores.value = { // Store for display under main canvas
+        sim1vs2: sim1vs2.toFixed(2),
+        sim1vsT: sim1vsT.toFixed(2),
+        sim2vsT: sim2vsT.toFixed(2),
+    };
+    saveResultsToLocalStorage(); 
+
+    // Display combined image on main canvas
+    if (drawingCanvasComponentRef.value) {
+      showTemplateLayer.value = true; // Reset to default visibility
+      showDrawing1Layer.value = true;
+      showDrawing2Layer.value = true;
+      triggerMainCanvasCombinedDisplay();
+    }
 
   } catch (error) {
     console.error("Error during image data conversion or comparison:", error);
@@ -236,6 +274,24 @@ async function compareAndDisplayResults() {
   
   // Visibility of comparisonArea is now handled by v-if in ComparisonResults.vue
 }
+
+function triggerMainCanvasCombinedDisplay() {
+  if (drawingCanvasComponentRef.value && stage.value === 'compared') {
+    drawingCanvasComponentRef.value.displayCombinedDrawing({
+      template: { url: currentTemplateSrc.value, show: showTemplateLayer.value, opacity: 0.3 },
+      drawing1: { url: drawing1DataURL.value, show: showDrawing1Layer.value, opacity: 0.4 },
+      drawing2: { url: drawing2DataURL.value, show: showDrawing2Layer.value, opacity: 0.4 }
+    });
+  }
+}
+
+// Watch for changes in layer visibility checkboxes to update the main canvas
+watch([showTemplateLayer, showDrawing1Layer, showDrawing2Layer], () => {
+  if (stage.value === 'compared') {
+    triggerMainCanvasCombinedDisplay();
+  }
+});
+
 
 function handleRestartProcess() {
   console.log('Restart Process clicked');
@@ -338,5 +394,50 @@ onMounted(() => {
   align-items: center;
   padding-top: 70px; /* Add padding to account for fixed navbar height + some space */
   /* padding: 20px; /* Original padding, now handled by body and adjusted here */
+}
+
+.main-canvas-results {
+  margin-top: 15px;
+  padding: 15px;
+  border: 1px solid var(--border-color-light);
+  border-radius: 5px;
+  background-color: var(--button-bg-light); /* Light background for contrast */
+  width: 100%;
+  max-width: 500px; /* Match drawing area width */
+  box-sizing: border-box;
+}
+
+body.dark-mode .main-canvas-results {
+  border-color: var(--border-color-dark);
+  background-color: var(--button-bg-dark);
+}
+
+.main-canvas-results h3 {
+  margin-top: 0;
+  text-align: center;
+}
+.main-canvas-results p {
+  margin: 5px 0;
+}
+
+.layer-controls {
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color-light);
+}
+body.dark-mode .layer-controls {
+  border-top-color: var(--border-color-dark);
+}
+.layer-controls h4 {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+.layer-controls label {
+  display: inline-block;
+  margin-right: 15px;
+  cursor: pointer;
+}
+.layer-controls input[type="checkbox"] {
+  margin-right: 5px;
 }
 </style>
