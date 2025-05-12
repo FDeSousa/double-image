@@ -2,8 +2,9 @@
   <div id="comparisonArea" v-if="results && results.length > 0">
     <div id="comparisonHeaderRow" class="comparison-header-row">
       <h2>Your comparisons:</h2>
-      <div id="overallAverageContainer" style="font-weight: bold;">
-        <p id="overallAverageText">Overall Average: {{ overallAverage.toFixed(2) }}%</p>
+      <div id="overallAverageContainer" style="font-weight: bold; text-align: right;">
+        <p id="overallAverageText">Overall Avg. Score: {{ overallAverage.toFixed(2) }}%</p>
+        <p v-if="overallAverageTime > 0" id="overallAverageTimeText" style="font-size: 0.9em; font-weight: normal;">Avg. Time per Drawing: {{ overallAverageTime.toFixed(2) }}s</p>
       </div>
     </div>
     <ComparisonSet 
@@ -38,6 +39,25 @@ const overallAverage = computed(() => {
     count += 3;
   });
   return count > 0 ? totalSimilarity / count : 0;
+});
+
+const overallAverageTime = computed(() => {
+  if (!props.results || props.results.length === 0) {
+    return 0;
+  }
+  let totalTime = 0;
+  let drawingCount = 0;
+  props.results.forEach(set => {
+    if (set.drawing1Time) {
+      totalTime += parseFloat(set.drawing1Time);
+      drawingCount++;
+    }
+    if (set.drawing2Time) {
+      totalTime += parseFloat(set.drawing2Time);
+      drawingCount++;
+    }
+  });
+  return drawingCount > 0 ? (totalTime / drawingCount) : 0;
 });
 </script>
 

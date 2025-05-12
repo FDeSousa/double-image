@@ -7,15 +7,17 @@
     <div class="comparison-set-row">
       <div class="comparison-container">
         <canvas :ref="el => canvasRefs[0] = el" aria-label="Comparison preview: Drawing 1 versus Drawing 2"></canvas>
-        <p>Drawing 1 vs Drawing 2: {{ resultSet.sim1vs2.toFixed(2) }}%</p>
+        <p>D1 vs D2: {{ resultSet.sim1vs2.toFixed(2) }}%</p>
       </div>
       <div class="comparison-container">
         <canvas :ref="el => canvasRefs[1] = el" aria-label="Comparison preview: Drawing 1 versus Template"></canvas>
-        <p>Drawing 1 vs Template: {{ resultSet.sim1vsT.toFixed(2) }}%</p>
+        <p>D1 vs Template: {{ resultSet.sim1vsT.toFixed(2) }}%</p>
+        <p v-if="resultSet.drawing1Time">Time: {{ resultSet.drawing1Time }}s</p>
       </div>
       <div class="comparison-container">
         <canvas :ref="el => canvasRefs[2] = el" aria-label="Comparison preview: Drawing 2 versus Template"></canvas>
-        <p>Drawing 2 vs Template: {{ resultSet.sim2vsT.toFixed(2) }}%</p>
+        <p>D2 vs Template: {{ resultSet.sim2vsT.toFixed(2) }}%</p>
+        <p v-if="resultSet.drawing2Time">Time: {{ resultSet.drawing2Time }}s</p>
       </div>
     </div>
   </div>

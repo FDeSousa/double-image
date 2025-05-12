@@ -19,8 +19,14 @@
       @clear-all-results="handleClearAllResults"
       @template-file-selected="handleTemplateFileSelected"
       @toggle-theme="toggleTheme"
+      @toggle-eraser="handleToggleEraser"
+      @undo-drawing="handleUndo"
+      @redo-drawing="handleRedo"
       :currentStage="stage" 
       :canClearAll="allComparisonResults.length > 0"
+      :isEraserEnabled="isEraserEnabled"
+      :canUndo="canUndo"
+      :canRedo="canRedo"
     />
     <ThumbnailPicker 
       :isVisible="thumbnailPickerVisible" 
@@ -30,19 +36,21 @@
     <DrawingCanvas 
       :templateSrc="currentTemplateSrc" 
       :stage="stage"
+      :isEraserActive="isEraserEnabled"
+      @undo-state-changed="updateUndoRedoState"
       ref="drawingCanvasComponentRef" 
     />
 
     <div v-if="stage === 'compared' && latestComparisonScores" class="main-canvas-results">
       <div class="scores-layout">
         <div class="individual-scores">
-          <h3>Latest Comparison Scores:</h3>
+          <h3>Latest Comparison Scores & Times:</h3>
           <p>Drawing 1 vs Drawing 2: {{ latestComparisonScores.sim1vs2 }}%</p>
-          <p>Drawing 1 vs Template: {{ latestComparisonScores.sim1vsT }}%</p>
-          <p>Drawing 2 vs Template: {{ latestComparisonScores.sim2vsT }}%</p>
+          <p>Drawing 1 vs Template: {{ latestComparisonScores.sim1vsT }}% <span v-if="latestDrawingTimes && latestDrawingTimes.d1">(Time: {{ latestDrawingTimes.d1 }}s)</span></p>
+          <p>Drawing 2 vs Template: {{ latestComparisonScores.sim2vsT }}% <span v-if="latestDrawingTimes && latestDrawingTimes.d2">(Time: {{ latestDrawingTimes.d2 }}s)</span></p>
         </div>
         <div class="average-score">
-          <h4>Average:</h4>
+          <h4>Avg. Score:</h4>
           <p>{{ latestScoresAverage }}%</p>
         </div>
       </div>
@@ -90,6 +98,19 @@ const showTemplateLayer = ref(true);
 const showDrawing1Layer = ref(true);
 const showDrawing2Layer = ref(true);
 
+// Timer related state
+const drawingStartTime = ref(0);
+const drawing1Time = ref(null); // in seconds
+const drawing2Time = ref(null); // in seconds
+const latestDrawingTimes = ref(null); // To display times for the current comparison
+
+// Eraser State
+const isEraserEnabled = ref(false);
+
+// Undo/Redo State
+const canUndo = ref(false);
+const canRedo = ref(false);
+
 const latestScoresAverage = computed(() => {
   if (!latestComparisonScores.value) return 0;
   const scores = latestComparisonScores.value;
@@ -108,6 +129,7 @@ function handleTemplateSelected(templatePath) {
     drawingCanvasComponentRef.value.clearDrawingCanvas();
   }
   stage.value = 'drawing1'; 
+  drawingStartTime.value = Date.now(); // Start timer for drawing 1
   thumbnailPickerVisible.value = false; 
 }
 
@@ -120,6 +142,7 @@ function handleTemplateFileSelected(file) {
         drawingCanvasComponentRef.value.clearDrawingCanvas();
     }
     stage.value = 'drawing1';
+  drawingStartTime.value = Date.now(); // Start timer for drawing 1
   };
   reader.onerror = (e) => {
     console.error("Error reading file:", e);
@@ -138,10 +161,10 @@ function handleSaveDrawing1() {
   console.log('Save Drawing 1 clicked');
   if (drawingCanvasComponentRef.value) {
     drawing1DataURL.value = drawingCanvasComponentRef.value.getCanvasDataURL();
-    console.log('Drawing 1 saved:', drawing1DataURL.value ? 'Data captured' : 'No data');
+    const endTime = Date.now();
+    drawing1Time.value = ((endTime - drawingStartTime.value) / 1000).toFixed(2); // Store time in seconds
+    console.log(`Drawing 1 saved in ${drawing1Time.value}s:`, drawing1DataURL.value ? 'Data captured' : 'No data');
     stage.value = 'readyForDrawing2';
-    // The template image in DrawingCanvas will be hidden/shown based on templateSrc prop
-    // We need to clear the canvas for the next drawing
     drawingCanvasComponentRef.value.clearDrawingCanvas(); 
   }
 }
@@ -149,19 +172,27 @@ function handleSaveDrawing1() {
 function handleStartDrawing2() {
   console.log('Start Drawing 2 clicked');
   stage.value = 'drawing2';
+  drawingStartTime.value = Date.now(); // Start timer for drawing 2
   if (drawingCanvasComponentRef.value) {
-    drawingCanvasComponentRef.value.clearDrawingCanvas(); // Clear for second drawing
+    drawingCanvasComponentRef.value.clearDrawingCanvas(); 
   }
-  // Template visibility is handled by :templateSrc prop in DrawingCanvas
 }
 
 function handleSaveDrawing2() {
   console.log('Save Drawing 2 & Compare clicked');
   if (drawingCanvasComponentRef.value) {
     drawing2DataURL.value = drawingCanvasComponentRef.value.getCanvasDataURL();
-    console.log('Drawing 2 saved:', drawing2DataURL.value ? 'Data captured' : 'No data');
+    const endTime = Date.now();
+    drawing2Time.value = ((endTime - drawingStartTime.value) / 1000).toFixed(2); // Store time in seconds
+    console.log(`Drawing 2 saved in ${drawing2Time.value}s:`, drawing2DataURL.value ? 'Data captured' : 'No data');
+    
+    latestDrawingTimes.value = { // For immediate display
+        d1: drawing1Time.value,
+        d2: drawing2Time.value
+    };
+
     stage.value = 'compared';
-    compareAndDisplayResults();
+    compareAndDisplayResults(); // This will now also include times in the comparison set
   }
 }
 
@@ -232,10 +263,27 @@ async function compareAndDisplayResults() {
     // Placeholder for actual comparison logic
     // console.log("ImageData ready for comparison: ", { data1, data2, templateImgData });
 
+    // Making comparison stricter by not ignoring colors initially.
+    // We can add .ignoreAlpha() if this is too strict or if transparent areas cause issues.
+    // ResembleJS v4.1.0 might have specific options for tolerance in the main call or compareTo.
+    // For now, let's try with default color comparison (by removing ignoreColors).
+    // If this is too harsh, .ignoreAntialiasing() or .ignoreAlpha() are options.
+    // The .scaleToSameSize() is usually true by default.
+
+    const resembleOptions = {
+      // Example: output an error pixel that's red
+      // errorColor: { red: 255, green: 0, blue: 255, alpha: 255 },
+      // errorType: 'movement', // flat, movement, flatDifferenceIntensity, movementDifferenceIntensity, diffOnly
+      // transparency: 0.3, // for diff image
+      // ignore: 'antialiasing' // options: nothing, less, antialiasing, colors, alpha
+    };
+    // We will try by removing .ignoreColors() first.
+    // If that's too much, we can try adding specific ignore options or tolerance if available.
+
     const comparisonPromises = [
-      new Promise(resolve => window.resemble(data1).compareTo(data2).ignoreColors().onComplete(resolve)),
-      new Promise(resolve => window.resemble(data1).compareTo(templateImgData).ignoreColors().onComplete(resolve)),
-      new Promise(resolve => window.resemble(data2).compareTo(templateImgData).ignoreColors().onComplete(resolve))
+      new Promise(resolve => window.resemble(data1).compareTo(data2)/* .ignoreColors() */.onComplete(resolve)),
+      new Promise(resolve => window.resemble(data1).compareTo(templateImgData)/* .ignoreColors() */.onComplete(resolve)),
+      new Promise(resolve => window.resemble(data2).compareTo(templateImgData)/* .ignoreColors() */.onComplete(resolve))
     ];
 
     const results = await Promise.all(comparisonPromises);
@@ -256,6 +304,8 @@ async function compareAndDisplayResults() {
       sim1vs2: sim1vs2,
       sim1vsT: sim1vsT,
       sim2vsT: sim2vsT,
+      drawing1Time: drawing1Time.value, // Add drawing 1 time
+      drawing2Time: drawing2Time.value  // Add drawing 2 time
     };
     allComparisonResults.value.push(newComparisonSet);
     latestComparisonScores.value = { // Store for display under main canvas
@@ -307,6 +357,27 @@ watch([showTemplateLayer, showDrawing1Layer, showDrawing2Layer], () => {
   }
 });
 
+function handleToggleEraser(newEraserState) {
+  isEraserEnabled.value = newEraserState;
+  // DrawingCanvas will react to the prop change directly for its internal mode.
+}
+
+function handleUndo() {
+  if (drawingCanvasComponentRef.value) {
+    drawingCanvasComponentRef.value.undo();
+  }
+}
+
+function handleRedo() {
+  if (drawingCanvasComponentRef.value) {
+    drawingCanvasComponentRef.value.redo();
+  }
+}
+
+function updateUndoRedoState({ canUndo: newCanUndo, canRedo: newCanRedo }) {
+  canUndo.value = newCanUndo;
+  canRedo.value = newCanRedo;
+}
 
 function handleRestartProcess() {
   console.log('Restart Process clicked');
