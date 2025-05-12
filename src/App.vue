@@ -259,26 +259,6 @@ async function compareAndDisplayResults() {
         console.error("Failed to convert one or more images to ImageData.");
         return;
     }
-    
-    // Placeholder for actual comparison logic
-    // console.log("ImageData ready for comparison: ", { data1, data2, templateImgData });
-
-    // Making comparison stricter by not ignoring colors initially.
-    // We can add .ignoreAlpha() if this is too strict or if transparent areas cause issues.
-    // ResembleJS v4.1.0 might have specific options for tolerance in the main call or compareTo.
-    // For now, let's try with default color comparison (by removing ignoreColors).
-    // If this is too harsh, .ignoreAntialiasing() or .ignoreAlpha() are options.
-    // The .scaleToSameSize() is usually true by default.
-
-    const resembleOptions = {
-      // Example: output an error pixel that's red
-      // errorColor: { red: 255, green: 0, blue: 255, alpha: 255 },
-      // errorType: 'movement', // flat, movement, flatDifferenceIntensity, movementDifferenceIntensity, diffOnly
-      // transparency: 0.3, // for diff image
-      // ignore: 'antialiasing' // options: nothing, less, antialiasing, colors, alpha
-    };
-    // We will try by removing .ignoreColors() first.
-    // If that's too much, we can try adding specific ignore options or tolerance if available.
 
     const comparisonPromises = [
       new Promise(resolve => window.resemble(data1).compareTo(data2)/* .ignoreColors() */.onComplete(resolve)),

@@ -30,7 +30,7 @@
 <script setup>
 // Vue 3 Composition API
 // defineEmits and defineProps are compiler macros and do not need to be imported.
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
 // eslint-disable-next-line no-undef
 const props = defineProps({
