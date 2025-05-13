@@ -71,13 +71,15 @@ function startDrawing(e) {
   if (props.stage !== 'drawing1' && props.stage !== 'drawing2') return;
   if (!ctx) return;
 
+  // console.log(`startDrawing: isEraserActive=${props.isEraserActive}`); // Removed log
   if (props.isEraserActive) {
     ctx.globalCompositeOperation = 'destination-out';
-    // Consider a larger line width for the eraser, or make it configurable
-    // For now, it will use the same line width as the pen. ctx.lineWidth = 10; // Example
+    ctx.lineWidth = 10; // Eraser line width
+    // console.log('startDrawing: Set to ERASER mode. Actual context gCO:', ctx.globalCompositeOperation, 'lw:', ctx.lineWidth); // Removed log
   } else {
     ctx.globalCompositeOperation = 'source-over';
-    // ctx.lineWidth = 2; // Reset to pen width
+    ctx.lineWidth = 2; // Pen line width
+    // console.log('startDrawing: Set to PEN mode. Actual context gCO:', ctx.globalCompositeOperation, 'lw:', ctx.lineWidth); // Removed log
   }
 
   isDrawing = true;
@@ -93,8 +95,13 @@ function draw(e) {
   ctx.moveTo(lastX, lastY);
   ctx.lineTo(coords.x, coords.y);
   // Eraser uses the current strokeStyle and lineWidth for its "brush" size/shape
-  ctx.strokeStyle = props.isEraserActive ? 'rgba(0,0,0,0)' : '#000000'; // Eraser stroke is effectively transparent
-  ctx.lineWidth = props.isEraserActive ? 10 : 2; // Example: Eraser is thicker
+  const currentLineWidth = props.isEraserActive ? 10 : 2;
+  const currentStrokeStyle = props.isEraserActive ? 'rgba(0,0,0,1)' : '#000000'; // Changed eraser alpha to 1
+  
+  // console.log(`draw: isEraserActive=${props.isEraserActive}, current tool lw=${currentLineWidth}, current tool ss=${currentStrokeStyle}. Actual context gCO=${ctx.globalCompositeOperation}, actual context lw=${ctx.lineWidth}`); // Removed log
+
+  ctx.strokeStyle = currentStrokeStyle; 
+  ctx.lineWidth = currentLineWidth; 
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.stroke();
@@ -136,8 +143,25 @@ function loadStateFromHistory(index) {
   if (!ctx || !drawingCanvasRef.value || !canvasHistory.value[index]) return;
   const img = new Image();
   img.onload = () => {
+    // CRITICAL FIX for redo: Ensure drawing mode is 'source-over' when restoring history
+    // const previousOperation = ctx.globalCompositeOperation; // Removed
+    // const previousLineWidth = ctx.lineWidth; // Removed
+
+    ctx.globalCompositeOperation = 'source-over'; // Always draw history images normally
+    
     ctx.clearRect(0, 0, drawingCanvasRef.value.width, drawingCanvasRef.value.height);
     ctx.drawImage(img, 0, 0);
+
+    // Restore the composite operation and line width that was active *before* this history load,
+    // so that the next drawing action uses the correct tool (pen/eraser) settings.
+    // This is important if the user undoes/redoes and then immediately draws without changing tools.
+    // However, setEraserMode is also called via watch on props.isEraserActive,
+    // which should ensure the correct mode is set if the prop changes.
+    // For safety, we can rely on setEraserMode to be the source of truth for current tool.
+    setEraserMode(props.isEraserActive); 
+    // Or, more directly:
+    // ctx.globalCompositeOperation = previousOperation;
+    // ctx.lineWidth = previousLineWidth;
   };
   img.src = canvasHistory.value[index];
 }
@@ -228,6 +252,7 @@ defineExpose({
 });
 
 watch(() => props.isEraserActive, (newValue) => {
+  // console.log(`WATCH props.isEraserActive changed to: ${newValue}. Calling setEraserMode.`); // Removed log
   setEraserMode(newValue);
 });
 
@@ -236,10 +261,14 @@ function setEraserMode(isErasing) {
     if (isErasing) {
       ctx.globalCompositeOperation = 'destination-out';
       ctx.lineWidth = 10; // Example: Eraser is thicker
+      // console.log('setEraserMode: ERASER active. gCO:', ctx.globalCompositeOperation, 'lineWidth:', ctx.lineWidth); // Removed log
     } else {
       ctx.globalCompositeOperation = 'source-over';
       ctx.lineWidth = 2; // Reset to default pen lineWidth
+      // console.log('setEraserMode: PEN active. gCO:', ctx.globalCompositeOperation, 'lineWidth:', ctx.lineWidth); // Removed log
     }
+  } else {
+    // console.log('setEraserMode: ctx is null, cannot set mode.'); // Removed log
   }
 }
 
@@ -315,6 +344,7 @@ async function displayCombinedDrawing(layers) {
   width: 500px; /* Example width, should match global or be configurable */
   height: 400px; /* Example height, should match global or be configurable */
   margin-bottom: 20px;
+  background-color: white; /* Added for testing eraser visibility */
 }
 
 #templateImage {
