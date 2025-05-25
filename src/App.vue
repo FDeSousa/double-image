@@ -6,28 +6,7 @@
     @clear-all-results="handleClearAllResults"
   />
   <div id="app-container" role="main">
-    <!-- <h1>On the other hand</h1> Main title is now in TopNavbar -->
-    <!-- <p class="subtitle">Try drawing with both hands! Can you be a two-hand artist?</p> Subtitle removed -->
-
-    <AppControls 
-      @toggle-thumbnails="handleToggleThumbnails" 
-      @clear-drawing="handleClearDrawing"
-      @save-drawing-1="handleSaveDrawing1"
-      @start-drawing-2="handleStartDrawing2"
-      @save-drawing-2="handleSaveDrawing2"
-      @restart-process="handleRestartProcess"
-      @clear-all-results="handleClearAllResults"
-      @template-file-selected="handleTemplateFileSelected"
-      @toggle-theme="toggleTheme"
-      @toggle-eraser="handleToggleEraser"
-      @undo-drawing="handleUndo"
-      @redo-drawing="handleRedo"
-      :currentStage="stage" 
-      :canClearAll="allComparisonResults.length > 0"
-      :isEraserEnabled="isEraserEnabled"
-      :canUndo="canUndo"
-      :canRedo="canRedo"
-    />
+    <!-- Old AppControls removed -->
     <ThumbnailPicker 
       :isVisible="thumbnailPickerVisible" 
       @select-template="handleTemplateSelected" 
@@ -37,8 +16,27 @@
       :templateSrc="currentTemplateSrc" 
       :stage="stage"
       :isEraserActive="isEraserEnabled"
+      :currentBrushSize="currentBrushSize"
       @undo-state-changed="updateUndoRedoState"
       ref="drawingCanvasComponentRef" 
+    />
+    <MainControls
+      :currentStage="stage"
+      :isEraserEnabled="isEraserEnabled"
+      :canUndo="canUndo"
+      :canRedo="canRedo"
+      :currentBrushSize="currentBrushSize"
+      @toggle-thumbnails="handleToggleThumbnails"
+      @save-drawing-1="handleSaveDrawing1"
+      @start-drawing-2="handleStartDrawing2"
+      @save-drawing-2="handleSaveDrawing2"
+      @restart-process="handleRestartProcess"
+      @template-file-selected="handleTemplateFileSelected"
+      @toggle-eraser="handleToggleEraser"
+      @undo-drawing="handleUndo"
+      @redo-drawing="handleRedo"
+      @clear-drawing="handleClearDrawing" 
+      @set-brush-size="handleSetBrushSize"
     />
 
     <div v-if="stage === 'compared' && latestComparisonScores" class="main-canvas-results">
@@ -48,10 +46,13 @@
           <p>Drawing 1 vs Drawing 2: {{ latestComparisonScores.sim1vs2 }}%</p>
           <p>Drawing 1 vs Template: {{ latestComparisonScores.sim1vsT }}% <span v-if="latestDrawingTimes && latestDrawingTimes.d1">(Time: {{ latestDrawingTimes.d1 }}s)</span></p>
           <p>Drawing 2 vs Template: {{ latestComparisonScores.sim2vsT }}% <span v-if="latestDrawingTimes && latestDrawingTimes.d2">(Time: {{ latestDrawingTimes.d2 }}s)</span></p>
+          <hr>
+          <p>Average Likeness: {{ latestComparisonScores.avgLikeness }}%</p>
+          <p>Time Efficiency: {{ latestComparisonScores.timeEfficiencyScore }}%</p>
         </div>
-        <div class="average-score">
-          <h4>Avg. Score:</h4>
-          <p>{{ latestScoresAverage }}%</p>
+        <div class="average-score"> 
+          <h4>Overall Score:</h4>
+          <p>{{ latestComparisonScores.overallScore }}%</p>
         </div>
       </div>
       
@@ -74,80 +75,64 @@
 </template>
 
 <script setup>
-// Script setup for Vue 3 Composition API
-import { ref, onMounted, watch, computed } from 'vue'; // Added watch and computed
+import { ref, onMounted, watch } from 'vue';
 import TopNavbar from './components/TopNavbar.vue'; 
-import AppControls from './components/AppControls.vue';
+// import AppControls from './components/AppControls.vue'; // Removed
 import ThumbnailPicker from './components/ThumbnailPicker.vue';
 import DrawingCanvas from './components/DrawingCanvas.vue';
+// import DrawingToolbar from './components/DrawingToolbar.vue'; // Removed
+import MainControls from './components/MainControls.vue'; // Added
 import ComparisonResults from './components/ComparisonResults.vue';
 
 const thumbnailPickerVisible = ref(false);
 const currentTemplateSrc = ref(null);
 const drawingCanvasComponentRef = ref(null);
-const stage = ref('initial'); // initial, drawing1, readyForDrawing2, drawing2, compared
+const stage = ref('initial');
 const allComparisonResults = ref([]); 
 const drawing1DataURL = ref(null);
-// eslint-disable-next-line no-unused-vars
 const drawing2DataURL = ref(null); 
-const currentTheme = ref('light'); // 'light' or 'dark'
-const latestComparisonScores = ref(null); // To store scores for display under main canvas
+const currentTheme = ref('light');
+const latestComparisonScores = ref(null);
 
-// Reactive states for layer visibility on main canvas
 const showTemplateLayer = ref(true);
 const showDrawing1Layer = ref(true);
 const showDrawing2Layer = ref(true);
 
-// Timer related state
 const drawingStartTime = ref(0);
-const drawing1Time = ref(null); // in seconds
-const drawing2Time = ref(null); // in seconds
-const latestDrawingTimes = ref(null); // To display times for the current comparison
+const drawing1Time = ref(null);
+const drawing2Time = ref(null);
+const latestDrawingTimes = ref(null);
 
-// Eraser State
 const isEraserEnabled = ref(false);
-
-// Undo/Redo State
+const currentBrushSize = ref(2); 
 const canUndo = ref(false);
 const canRedo = ref(false);
-
-const latestScoresAverage = computed(() => {
-  if (!latestComparisonScores.value) return 0;
-  const scores = latestComparisonScores.value;
-  const avg = ((parseFloat(scores.sim1vs2) || 0) + (parseFloat(scores.sim1vsT) || 0) + (parseFloat(scores.sim2vsT) || 0)) / 3;
-  return avg.toFixed(2);
-});
 
 function handleToggleThumbnails() {
   thumbnailPickerVisible.value = !thumbnailPickerVisible.value;
 }
 
 function handleTemplateSelected(templatePath) {
-  console.log("Template selected in App.vue:", templatePath);
   currentTemplateSrc.value = templatePath;
-  if (drawingCanvasComponentRef.value) { // Clear canvas for new template
+  if (drawingCanvasComponentRef.value) {
     drawingCanvasComponentRef.value.clearDrawingCanvas();
   }
   stage.value = 'drawing1'; 
-  drawingStartTime.value = Date.now(); // Start timer for drawing 1
+  drawingStartTime.value = Date.now();
   thumbnailPickerVisible.value = false; 
 }
 
 function handleTemplateFileSelected(file) {
-  console.log("Template file selected:", file.name);
   const reader = new FileReader();
   reader.onload = (e) => {
     currentTemplateSrc.value = e.target.result;
-    if (drawingCanvasComponentRef.value) { // Clear canvas for new template
+    if (drawingCanvasComponentRef.value) {
         drawingCanvasComponentRef.value.clearDrawingCanvas();
     }
     stage.value = 'drawing1';
-  drawingStartTime.value = Date.now(); // Start timer for drawing 1
+    drawingStartTime.value = Date.now();
   };
-  reader.onerror = (e) => {
-    console.error("Error reading file:", e);
-    alert("Error reading template file.");
-  };
+  reader.onerror = () => alert("Error reading template file.");
   reader.readAsDataURL(file);
 }
 
@@ -158,166 +143,119 @@ function handleClearDrawing() {
 }
 
 function handleSaveDrawing1() {
-  console.log('Save Drawing 1 clicked');
   if (drawingCanvasComponentRef.value) {
     drawing1DataURL.value = drawingCanvasComponentRef.value.getCanvasDataURL();
     const endTime = Date.now();
-    drawing1Time.value = ((endTime - drawingStartTime.value) / 1000).toFixed(2); // Store time in seconds
-    console.log(`Drawing 1 saved in ${drawing1Time.value}s:`, drawing1DataURL.value ? 'Data captured' : 'No data');
+    drawing1Time.value = ((endTime - drawingStartTime.value) / 1000).toFixed(2);
     stage.value = 'readyForDrawing2';
     drawingCanvasComponentRef.value.clearDrawingCanvas(); 
   }
 }
 
 function handleStartDrawing2() {
-  console.log('Start Drawing 2 clicked');
   stage.value = 'drawing2';
-  drawingStartTime.value = Date.now(); // Start timer for drawing 2
+  drawingStartTime.value = Date.now();
   if (drawingCanvasComponentRef.value) {
     drawingCanvasComponentRef.value.clearDrawingCanvas(); 
   }
 }
 
 function handleSaveDrawing2() {
-  console.log('Save Drawing 2 & Compare clicked');
   if (drawingCanvasComponentRef.value) {
     drawing2DataURL.value = drawingCanvasComponentRef.value.getCanvasDataURL();
     const endTime = Date.now();
-    drawing2Time.value = ((endTime - drawingStartTime.value) / 1000).toFixed(2); // Store time in seconds
-    console.log(`Drawing 2 saved in ${drawing2Time.value}s:`, drawing2DataURL.value ? 'Data captured' : 'No data');
-    
-    latestDrawingTimes.value = { // For immediate display
-        d1: drawing1Time.value,
-        d2: drawing2Time.value
-    };
-
+    drawing2Time.value = ((endTime - drawingStartTime.value) / 1000).toFixed(2);
+    latestDrawingTimes.value = { d1: drawing1Time.value, d2: drawing2Time.value };
     stage.value = 'compared';
-    compareAndDisplayResults(); // This will now also include times in the comparison set
+    compareAndDisplayResults();
   }
 }
 
 async function urlToImageData(url) {
   return new Promise((resolve, reject) => {
-    if (!url) {
-      reject(new Error("URL is null or empty"));
-      return;
-    }
+    if (!url) reject(new Error("URL is null"));
     const img = new Image();
-    img.crossOrigin = 'Anonymous'; // Handle CORS if loading from different origins
+    img.crossOrigin = 'Anonymous';
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      // Attempt to use natural dimensions, but fallback if not available (e.g. for very small/broken images)
-      // For comparison, it's best if all images are compared at the same dimensions.
-      // The drawing canvas dimensions could be a good reference.
       const targetWidth = drawingCanvasComponentRef.value?.drawingCanvasRef?.width || 500;
       const targetHeight = drawingCanvasComponentRef.value?.drawingCanvasRef?.height || 400;
       canvas.width = targetWidth;
       canvas.height = targetHeight;
       const ctx = canvas.getContext('2d');
-      
-      // Draw image scaled to fit target dimensions while maintaining aspect ratio
       const hRatio = targetWidth / img.naturalWidth;
       const vRatio = targetHeight / img.naturalHeight;
       const ratio = Math.min(hRatio, vRatio);
       const centerShift_x = (targetWidth - img.naturalWidth * ratio) / 2;
       const centerShift_y = (targetHeight - img.naturalHeight * ratio) / 2;
-      
       ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight,
                     centerShift_x, centerShift_y, img.naturalWidth * ratio, img.naturalHeight * ratio);
       resolve(ctx.getImageData(0, 0, targetWidth, targetHeight));
     };
-    img.onerror = (err) => {
-      console.error("Error loading image for ImageData conversion:", url, err);
-      reject(new Error(`Failed to load image: ${url}`));
-    };
+    img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
     img.src = url;
   });
 }
 
 async function compareAndDisplayResults() {
-  console.log('Comparing images...');
-  if (!drawing1DataURL.value || !drawing2DataURL.value || !currentTemplateSrc.value) {
-    console.error("Missing data for comparison.");
-    return;
-  }
-
+  if (!drawing1DataURL.value || !drawing2DataURL.value || !currentTemplateSrc.value) return;
   try {
-    // Ensure ResembleJS is loaded (it's global via CDN)
     if (typeof window.resemble === 'undefined') {
-      alert("Resemble.js not loaded. Cannot compare images.");
-      console.error("Resemble.js is not defined on window.");
-      return;
+      alert("Resemble.js not loaded."); return;
     }
-
     const [data1, data2, templateImgData] = await Promise.all([
       urlToImageData(drawing1DataURL.value),
       urlToImageData(drawing2DataURL.value),
       urlToImageData(currentTemplateSrc.value)
     ]);
-
-    if (!data1 || !data2 || !templateImgData) {
-        console.error("Failed to convert one or more images to ImageData.");
-        return;
-    }
+    if (!data1 || !data2 || !templateImgData) return;
 
     const comparisonPromises = [
-      new Promise(resolve => window.resemble(data1).compareTo(data2)/* .ignoreColors() */.onComplete(resolve)),
-      new Promise(resolve => window.resemble(data1).compareTo(templateImgData)/* .ignoreColors() */.onComplete(resolve)),
-      new Promise(resolve => window.resemble(data2).compareTo(templateImgData)/* .ignoreColors() */.onComplete(resolve))
+      new Promise(resolve => window.resemble(data1).compareTo(data2).onComplete(resolve)),
+      new Promise(resolve => window.resemble(data1).compareTo(templateImgData).onComplete(resolve)),
+      new Promise(resolve => window.resemble(data2).compareTo(templateImgData).onComplete(resolve))
     ];
-
     const results = await Promise.all(comparisonPromises);
 
     const sim1vs2 = 100 - parseFloat(results[0].rawMisMatchPercentage);
     const sim1vsT = 100 - parseFloat(results[1].rawMisMatchPercentage);
     const sim2vsT = 100 - parseFloat(results[2].rawMisMatchPercentage);
 
-    console.log(`Similarity - Drawing 1 vs Drawing 2: ${sim1vs2.toFixed(2)}%`);
-    console.log(`Similarity - Drawing 1 vs Template: ${sim1vsT.toFixed(2)}%`);
-    console.log(`Similarity - Drawing 2 vs Template: ${sim2vsT.toFixed(2)}%`);
+    const avgLikeness = (sim1vs2 + sim1vsT + sim2vsT) / 3;
+    const timeDiff = Math.abs(parseFloat(drawing1Time.value) - parseFloat(drawing2Time.value));
+    const timeEfficiencyK = 2;
+    const timeEfficiencyScore = Math.max(0, 100 - (timeDiff * timeEfficiencyK));
+    const weightLikeness = 0.7;
+    const weightTime = 0.3;
+    const overallScore = (weightLikeness * avgLikeness) + (weightTime * timeEfficiencyScore);
 
     const newComparisonSet = {
       id: allComparisonResults.value.length, 
       drawing1URL: drawing1DataURL.value,
       drawing2URL: drawing2DataURL.value,
       templateURL: currentTemplateSrc.value,
-      sim1vs2: sim1vs2,
-      sim1vsT: sim1vsT,
-      sim2vsT: sim2vsT,
-      drawing1Time: drawing1Time.value, // Add drawing 1 time
-      drawing2Time: drawing2Time.value  // Add drawing 2 time
+      sim1vs2: sim1vs2, sim1vsT: sim1vsT, sim2vsT: sim2vsT,
+      drawing1Time: drawing1Time.value, drawing2Time: drawing2Time.value,
+      avgLikeness: parseFloat(avgLikeness.toFixed(2)),
+      timeEfficiencyScore: parseFloat(timeEfficiencyScore.toFixed(2)),
+      overallScore: parseFloat(overallScore.toFixed(2))
     };
     allComparisonResults.value.push(newComparisonSet);
-    latestComparisonScores.value = { // Store for display under main canvas
-        sim1vs2: sim1vs2.toFixed(2),
-        sim1vsT: sim1vsT.toFixed(2),
-        sim2vsT: sim2vsT.toFixed(2),
+    latestComparisonScores.value = {
+        sim1vs2: sim1vs2.toFixed(2), sim1vsT: sim1vsT.toFixed(2), sim2vsT: sim2vsT.toFixed(2),
+        avgLikeness: avgLikeness.toFixed(2),
+        timeEfficiencyScore: timeEfficiencyScore.toFixed(2),
+        overallScore: overallScore.toFixed(2)
     };
-    saveResultsToLocalStorage(); 
-
-    // Display combined image on main canvas
+    saveResultsToLocalStorage();
     if (drawingCanvasComponentRef.value) {
-      showTemplateLayer.value = true; // Reset to default visibility
-      showDrawing1Layer.value = true;
-      showDrawing2Layer.value = true;
+      showTemplateLayer.value = true; showDrawing1Layer.value = true; showDrawing2Layer.value = true;
       triggerMainCanvasCombinedDisplay();
     }
-
   } catch (error) {
-    console.error("Error during image data conversion or comparison:", error);
-    alert("An error occurred during image comparison. Check the console.");
+    console.error("Error during comparison:", error);
+    alert("An error occurred during image comparison.");
   }
-  // This will involve:
-  // 1. Getting ImageData for drawing1DataURL, drawing2DataURL, and currentTemplateSrc (if it's an image URL)
-  //    or directly from canvas if we decide to draw template onto a hidden canvas.
-  // 2. Using Resemble.js to compare them.
-  // 3. Storing results in allComparisonResults.
-  // 4. Making comparisonArea visible.
-  console.log('Drawing 1 URL:', drawing1DataURL.value);
-  console.log('Drawing 2 URL:', drawing2DataURL.value);
-  console.log('Template URL:', currentTemplateSrc.value);
-  
-  // Visibility of comparisonArea is now handled by v-if in ComparisonResults.vue
 }
 
 function triggerMainCanvasCombinedDisplay() {
@@ -330,28 +268,24 @@ function triggerMainCanvasCombinedDisplay() {
   }
 }
 
-// Watch for changes in layer visibility checkboxes to update the main canvas
 watch([showTemplateLayer, showDrawing1Layer, showDrawing2Layer], () => {
-  if (stage.value === 'compared') {
-    triggerMainCanvasCombinedDisplay();
-  }
+  if (stage.value === 'compared') triggerMainCanvasCombinedDisplay();
 });
 
 function handleToggleEraser(newEraserState) {
   isEraserEnabled.value = newEraserState;
-  // DrawingCanvas will react to the prop change directly for its internal mode.
+}
+
+function handleSetBrushSize(newSize) {
+  currentBrushSize.value = newSize;
 }
 
 function handleUndo() {
-  if (drawingCanvasComponentRef.value) {
-    drawingCanvasComponentRef.value.undo();
-  }
+  if (drawingCanvasComponentRef.value) drawingCanvasComponentRef.value.undo();
 }
 
 function handleRedo() {
-  if (drawingCanvasComponentRef.value) {
-    drawingCanvasComponentRef.value.redo();
-  }
+  if (drawingCanvasComponentRef.value) drawingCanvasComponentRef.value.redo();
 }
 
 function updateUndoRedoState({ canUndo: newCanUndo, canRedo: newCanRedo }) {
@@ -360,7 +294,6 @@ function updateUndoRedoState({ canUndo: newCanUndo, canRedo: newCanRedo }) {
 }
 
 function handleRestartProcess() {
-  console.log('Restart Process clicked');
   currentTemplateSrc.value = null; 
   drawing1DataURL.value = null;
   drawing2DataURL.value = null;
@@ -368,169 +301,96 @@ function handleRestartProcess() {
   if (drawingCanvasComponentRef.value) {
     drawingCanvasComponentRef.value.clearDrawingCanvas();
   }
-  // Comparison results are not cleared here, only the current drawing process
 }
 
 function handleClearAllResults() {
-  console.log('Clear All Results clicked');
   allComparisonResults.value = [];
   drawing1DataURL.value = null;
   drawing2DataURL.value = null;
-  currentTemplateSrc.value = null; // Also clear current template
-  saveResultsToLocalStorage(); // Save the empty array to localStorage
-  stage.value = 'initial'; // Reset stage
+  currentTemplateSrc.value = null;
+  saveResultsToLocalStorage();
+  stage.value = 'initial';
   if (drawingCanvasComponentRef.value) {
     drawingCanvasComponentRef.value.clearDrawingCanvas();
   }
 }
 
 const LOCAL_STORAGE_KEY = 'doubleImageVueResults';
-
 function saveResultsToLocalStorage() {
-  try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(allComparisonResults.value));
-    console.log('Results saved to localStorage');
-  } catch (e) {
-    console.error("Error saving results to localStorage:", e);
-  }
+  try { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(allComparisonResults.value)); }
+  catch (e) { console.error("Error saving to localStorage:", e); }
 }
-
 function loadResultsFromLocalStorage() {
   try {
     const savedResults = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (savedResults) {
-      allComparisonResults.value = JSON.parse(savedResults);
-      console.log('Results loaded from localStorage');
-    }
-  } catch (e) {
-    console.error("Error loading results from localStorage:", e);
-    allComparisonResults.value = []; 
-  }
+    if (savedResults) allComparisonResults.value = JSON.parse(savedResults);
+  } catch (e) { console.error("Error loading from localStorage:", e); }
 }
 
 const THEME_STORAGE_KEY = 'doubleImageVueTheme';
-
 function applyTheme(theme) {
-  if (theme === 'dark') {
-    document.body.classList.add('dark-mode');
-  } else {
-    document.body.classList.remove('dark-mode');
-  }
+  document.body.classList.toggle('dark-mode', theme === 'dark');
   currentTheme.value = theme;
 }
-
 function toggleTheme() {
   const newTheme = currentTheme.value === 'light' ? 'dark' : 'light';
   applyTheme(newTheme);
-  try {
-    localStorage.setItem(THEME_STORAGE_KEY, newTheme);
-  } catch (e) {
-    console.error("Error saving theme to localStorage:", e);
-  }
+  try { localStorage.setItem(THEME_STORAGE_KEY, newTheme); }
+  catch (e) { console.error("Error saving theme to localStorage:", e); }
 }
-
 function loadThemeFromLocalStorage() {
   try {
-    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-    if (savedTheme) {
-      applyTheme(savedTheme);
-    } else {
-      applyTheme('light'); // Default to light theme
-    }
-  } catch (e) {
-    console.error("Error loading theme from localStorage:", e);
-    applyTheme('light'); // Default on error
-  }
+    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || 'light';
+    applyTheme(savedTheme);
+  } catch (e) { console.error("Error loading theme from localStorage:", e); applyTheme('light'); }
 }
 
 onMounted(() => {
   loadResultsFromLocalStorage();
   loadThemeFromLocalStorage();
 });
-
-// We will add imports and logic here as we build components
 </script>
 
 <style>
-/* Styles from style.css are now global. 
-   App-specific or scoped styles can be added here if needed. */
 #app-container { 
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 55px; /* Reduced padding: navbar height (~40-45px) + ~10px space */
-  /* padding: 20px; /* Original padding, now handled by body and adjusted here */
+  padding-top: 55px;
 }
-
 .scores-layout {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start; /* Align items to the top */
-  margin-bottom: 15px; /* Space before layer controls */
+  align-items: flex-start;
+  margin-bottom: 15px;
 }
-
-.individual-scores {
-  flex-grow: 1;
-}
-
+.individual-scores { flex-grow: 1; }
 .average-score {
   text-align: right;
-  padding-left: 20px; /* Space between individual scores and average */
-  min-width: 100px; /* Ensure it has some width */
+  padding-left: 20px;
+  min-width: 100px;
 }
-.average-score h4 {
-  margin-top: 0;
-  margin-bottom: 5px;
-}
-.average-score p {
-  font-size: 1.2em;
-  font-weight: bold;
-  margin: 0;
-}
-
-
+.average-score h4 { margin-top: 0; margin-bottom: 5px; }
+.average-score p { font-size: 1.2em; font-weight: bold; margin: 0; }
 .main-canvas-results {
-  margin-top: 15px;
-  padding: 15px;
+  margin-top: 15px; padding: 15px;
   border: 1px solid var(--border-color-light);
   border-radius: 5px;
-  background-color: var(--button-bg-light); /* Light background for contrast */
-  width: 100%;
-  max-width: 500px; /* Match drawing area width */
-  box-sizing: border-box;
+  background-color: var(--button-bg-light);
+  width: 100%; max-width: 500px; box-sizing: border-box;
 }
-
 body.dark-mode .main-canvas-results {
   border-color: var(--border-color-dark);
   background-color: var(--button-bg-dark);
 }
-
-.main-canvas-results h3 {
-  margin-top: 0;
-  text-align: center;
-}
-.main-canvas-results p {
-  margin: 5px 0;
-}
-
+.main-canvas-results h3 { margin-top: 0; text-align: center; }
+.main-canvas-results p { margin: 5px 0; }
 .layer-controls {
-  margin-top: 15px;
-  padding-top: 10px;
+  margin-top: 15px; padding-top: 10px;
   border-top: 1px solid var(--border-color-light);
 }
-body.dark-mode .layer-controls {
-  border-top-color: var(--border-color-dark);
-}
-.layer-controls h4 {
-  margin-top: 0;
-  margin-bottom: 8px;
-}
-.layer-controls label {
-  display: inline-block;
-  margin-right: 15px;
-  cursor: pointer;
-}
-.layer-controls input[type="checkbox"] {
-  margin-right: 5px;
-}
+body.dark-mode .layer-controls { border-top-color: var(--border-color-dark); }
+.layer-controls h4 { margin-top: 0; margin-bottom: 8px; }
+.layer-controls label { display: inline-block; margin-right: 15px; cursor: pointer; }
+.layer-controls input[type="checkbox"] { margin-right: 5px; }
 </style>

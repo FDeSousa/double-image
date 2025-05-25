@@ -2,23 +2,31 @@
   <div class="comparison-set">
     <div class="comparison-set-header-row">
       <h3>Comparison Set {{ resultSet.id + 1 }}</h3>
-      <p>Set Average: {{ setAverage.toFixed(2) }}%</p>
+      <p>Overall Score: {{ resultSet.overallScore ? resultSet.overallScore.toFixed(2) : 'N/A' }}%</p>
     </div>
     <div class="comparison-set-row">
       <div class="comparison-container">
         <canvas :ref="el => canvasRefs[0] = el" aria-label="Comparison preview: Drawing 1 versus Drawing 2"></canvas>
         <p>D1 vs D2: {{ resultSet.sim1vs2.toFixed(2) }}%</p>
+        <p class="time-placeholder">&nbsp;</p> <!-- Placeholder for spacing -->
+        <!-- <img v-if="resultSet.diffUrl1vs2" :src="resultSet.diffUrl1vs2" alt="Difference D1 vs D2" class="diff-image"/> -->
       </div>
       <div class="comparison-container">
         <canvas :ref="el => canvasRefs[1] = el" aria-label="Comparison preview: Drawing 1 versus Template"></canvas>
         <p>D1 vs Template: {{ resultSet.sim1vsT.toFixed(2) }}%</p>
         <p v-if="resultSet.drawing1Time">Time: {{ resultSet.drawing1Time }}s</p>
+        <!-- <img v-if="resultSet.diffUrl1vsT" :src="resultSet.diffUrl1vsT" alt="Difference D1 vs Template" class="diff-image"/> -->
       </div>
       <div class="comparison-container">
         <canvas :ref="el => canvasRefs[2] = el" aria-label="Comparison preview: Drawing 2 versus Template"></canvas>
         <p>D2 vs Template: {{ resultSet.sim2vsT.toFixed(2) }}%</p>
         <p v-if="resultSet.drawing2Time">Time: {{ resultSet.drawing2Time }}s</p>
+        <!-- <img v-if="resultSet.diffUrl2vsT" :src="resultSet.diffUrl2vsT" alt="Difference D2 vs Template" class="diff-image"/> -->
       </div>
+    </div>
+    <div class="comparison-set-footer-row" v-if="resultSet.avgLikeness !== undefined">
+      <p>Avg. Likeness: {{ resultSet.avgLikeness.toFixed(2) }}%</p>
+      <p>Time Efficiency: {{ resultSet.timeEfficiencyScore.toFixed(2) }}%</p>
     </div>
   </div>
 </template>
@@ -32,13 +40,13 @@ const props = defineProps({
 
 const canvasRefs = ref([]); // Array to hold refs for the three canvases
 
-const setAverage = ref(0);
+// const setAverage = ref(0); // No longer needed as overallScore is directly in resultSet
 
-function calculateSetAverage() {
-  if (props.resultSet) {
-    setAverage.value = (props.resultSet.sim1vs2 + props.resultSet.sim1vsT + props.resultSet.sim2vsT) / 3;
-  }
-}
+// function calculateSetAverage() { // No longer needed
+//   if (props.resultSet) {
+//     setAverage.value = (props.resultSet.sim1vs2 + props.resultSet.sim1vsT + props.resultSet.sim2vsT) / 3;
+//   }
+// }
 
 // Draws two specified images onto a canvas, with options for styling the base image if it's a template
 async function drawPairedImages(targetCanvas, baseImageURL, overlayImageURL, isBaseImageTemplate) {
@@ -108,13 +116,13 @@ function renderCanvases() {
 
 onMounted(async () => {
   await nextTick(); // Ensure canvas refs are populated
-  calculateSetAverage();
+  // calculateSetAverage(); // No longer needed
   renderCanvases();
 });
 
 watch(() => props.resultSet, async () => {
   await nextTick();
-  calculateSetAverage();
+  // calculateSetAverage(); // No longer needed
   renderCanvases();
 }, { deep: true });
 
@@ -151,6 +159,18 @@ watch(() => props.resultSet, async () => {
 .comparison-set-header-row p {
     margin: 0; /* Remove default margins */
 }
+.comparison-set-footer-row {
+  width: 100%;
+  display: flex;
+  justify-content: space-around;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+  font-size: 0.9em;
+}
+.comparison-set-footer-row p {
+  margin: 0 10px;
+}
 .comparison-set-row {
   width: 100%;
   display: flex;
@@ -169,13 +189,26 @@ watch(() => props.resultSet, async () => {
 }
 .comparison-container canvas {
   border: 1px solid #eee;
-  width: 200px; 
-  height: 150px;
+  width: 100%; /* Make canvas responsive within its container */
+  max-width: 200px; /* But don't let it get larger than original design */
+  height: 150px; /* Keep height fixed for now, or use aspect-ratio */
+  object-fit: contain; /* Ensure content scales nicely if canvas aspect ratio changes */
   margin-bottom: 5px;
 }
+/* .diff-image {
+  width: 200px; 
+  height: 150px; 
+  border: 1px solid #ccc;
+  margin-top: 5px;
+  object-fit: contain; 
+} */
 .comparison-container p {
   font-size: 0.9em;
   margin: 0;
+  min-height: 1.2em; /* Ensure p tags take up space even if empty, matching typical line height */
+}
+.time-placeholder {
+  visibility: hidden; /* Keeps space without showing content */
 }
 
 @media (max-width: 768px) {

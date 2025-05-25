@@ -19,7 +19,11 @@ import { ref, onMounted, onUnmounted, watch } from 'vue';
 const props = defineProps({
   templateSrc: String,
   stage: String, 
-  isEraserActive: Boolean 
+  isEraserActive: Boolean,
+  currentBrushSize: {
+    type: Number,
+    default: 2 
+  }
 });
 
 // eslint-disable-next-line no-undef
@@ -31,39 +35,51 @@ let isDrawing = false;
 let lastX = 0;
 let lastY = 0;
 
-// Undo/Redo History
 const canvasHistory = ref([]);
-const historyPointer = ref(-1); // Points to the current state in canvasHistory
+const historyPointer = ref(-1); 
 const MAX_HISTORY_STATES = 20; 
 
-// Canvas setup and drawing functions
 function resizeCanvas() {
   const canvas = drawingCanvasRef.value;
-  if (!canvas || !canvas.parentElement) return;
-  const rect = canvas.parentElement.getBoundingClientRect();
+  if (!canvas) return; 
   
-  // Save current drawing to re-apply after resize if needed
+  const rect = canvas.getBoundingClientRect(); // Get CSS display size of the canvas itself
+
   let currentDrawingData = null;
-  if (ctx) { // only if context exists
+  if (ctx && canvas.width > 0 && canvas.height > 0) {
       currentDrawingData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   }
 
+  // Set internal buffer size to match its CSS display size
   canvas.width = rect.width;
   canvas.height = rect.height;
 
-  if (ctx && currentDrawingData) { // Re-apply if context and data exist
-      ctx.putImageData(currentDrawingData, 0, 0);
+  // NO ctx.scale(dpr, dpr) here
+
+  if (ctx && currentDrawingData) { 
+      ctx.putImageData(currentDrawingData, 0, 0); 
   }
-  // Note: History states are DataURLs, they don't need explicit resizing,
-  // but redrawing from history will use the new canvas size.
+  
+  if(ctx) {
+    setEraserMode(props.isEraserActive); 
+  }
 }
 
 function getCoords(e) {
   const canvas = drawingCanvasRef.value;
   if (!canvas) return { x: 0, y: 0 };
-  const rect = canvas.getBoundingClientRect();
-  let x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-  let y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+  const rect = canvas.getBoundingClientRect(); // CSS position and size
+
+  // Re-introduce scaling factors. If canvas.width === rect.width, scaleX is 1.
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  
+  const x = (clientX - rect.left) * scaleX;
+  const y = (clientY - rect.top) * scaleY;
+
   return { x, y };
 }
 
@@ -71,37 +87,21 @@ function startDrawing(e) {
   if (props.stage !== 'drawing1' && props.stage !== 'drawing2') return;
   if (!ctx) return;
 
-  // console.log(`startDrawing: isEraserActive=${props.isEraserActive}`); // Removed log
-  if (props.isEraserActive) {
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.lineWidth = 10; // Eraser line width
-    // console.log('startDrawing: Set to ERASER mode. Actual context gCO:', ctx.globalCompositeOperation, 'lw:', ctx.lineWidth); // Removed log
-  } else {
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.lineWidth = 2; // Pen line width
-    // console.log('startDrawing: Set to PEN mode. Actual context gCO:', ctx.globalCompositeOperation, 'lw:', ctx.lineWidth); // Removed log
-  }
+  setEraserMode(props.isEraserActive); 
 
   isDrawing = true;
   const coords = getCoords(e);
   [lastX, lastY] = [coords.x, coords.y];
+  ctx.beginPath(); 
+  ctx.moveTo(lastX, lastY); 
   if (e.type === 'touchstart') e.preventDefault();
 }
 
 function draw(e) {
   if (!isDrawing || !ctx) return;
   const coords = getCoords(e);
-  ctx.beginPath();
-  ctx.moveTo(lastX, lastY);
   ctx.lineTo(coords.x, coords.y);
-  // Eraser uses the current strokeStyle and lineWidth for its "brush" size/shape
-  const currentLineWidth = props.isEraserActive ? 10 : 2;
-  const currentStrokeStyle = props.isEraserActive ? 'rgba(0,0,0,1)' : '#000000'; // Changed eraser alpha to 1
   
-  // console.log(`draw: isEraserActive=${props.isEraserActive}, current tool lw=${currentLineWidth}, current tool ss=${currentStrokeStyle}. Actual context gCO=${ctx.globalCompositeOperation}, actual context lw=${ctx.lineWidth}`); // Removed log
-
-  ctx.strokeStyle = currentStrokeStyle; 
-  ctx.lineWidth = currentLineWidth; 
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.stroke();
@@ -112,21 +112,19 @@ function draw(e) {
 function stopDrawing() {
   if (!isDrawing) return;
   isDrawing = false;
-  if (props.stage === 'drawing1' || props.stage === 'drawing2') { // Only save history if in a drawing stage
+  if (props.stage === 'drawing1' || props.stage === 'drawing2') {
     saveHistoryState();
   }
 }
 
 function saveHistoryState() {
   if (!drawingCanvasRef.value) return;
-  // Clear any "redo" states if a new drawing action occurs after an undo
   if (historyPointer.value < canvasHistory.value.length - 1) {
     canvasHistory.value.splice(historyPointer.value + 1);
   }
-
   canvasHistory.value.push(drawingCanvasRef.value.toDataURL());
   if (canvasHistory.value.length > MAX_HISTORY_STATES) {
-    canvasHistory.value.shift(); // Remove the oldest state
+    canvasHistory.value.shift(); 
   }
   historyPointer.value = canvasHistory.value.length - 1;
   emitUndoRedoState();
@@ -143,25 +141,12 @@ function loadStateFromHistory(index) {
   if (!ctx || !drawingCanvasRef.value || !canvasHistory.value[index]) return;
   const img = new Image();
   img.onload = () => {
-    // CRITICAL FIX for redo: Ensure drawing mode is 'source-over' when restoring history
-    // const previousOperation = ctx.globalCompositeOperation; // Removed
-    // const previousLineWidth = ctx.lineWidth; // Removed
-
-    ctx.globalCompositeOperation = 'source-over'; // Always draw history images normally
-    
+    const originalGCO = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = 'source-over'; 
     ctx.clearRect(0, 0, drawingCanvasRef.value.width, drawingCanvasRef.value.height);
     ctx.drawImage(img, 0, 0);
-
-    // Restore the composite operation and line width that was active *before* this history load,
-    // so that the next drawing action uses the correct tool (pen/eraser) settings.
-    // This is important if the user undoes/redoes and then immediately draws without changing tools.
-    // However, setEraserMode is also called via watch on props.isEraserActive,
-    // which should ensure the correct mode is set if the prop changes.
-    // For safety, we can rely on setEraserMode to be the source of truth for current tool.
+    ctx.globalCompositeOperation = originalGCO; 
     setEraserMode(props.isEraserActive); 
-    // Or, more directly:
-    // ctx.globalCompositeOperation = previousOperation;
-    // ctx.lineWidth = previousLineWidth;
   };
   img.src = canvasHistory.value[index];
 }
@@ -182,13 +167,12 @@ function redo() {
   }
 }
 
-// Lifecycle hooks
 onMounted(() => {
   const canvas = drawingCanvasRef.value;
   if (canvas) {
     ctx = canvas.getContext('2d');
-    resizeCanvas();
-    clearDrawingCanvas(); // This will also save the initial blank state for undo
+    resizeCanvas(); 
+    clearDrawingCanvas(); 
 
     window.addEventListener('resize', resizeCanvas);
 
@@ -200,8 +184,6 @@ onMounted(() => {
     canvas.addEventListener('touchmove', draw, { passive: false });
     canvas.addEventListener('touchend', stopDrawing);
     canvas.addEventListener('touchcancel', stopDrawing);
-    
-    console.log('DrawingCanvas.vue mounted and initialized.');
   }
 });
 
@@ -210,33 +192,26 @@ onUnmounted(() => {
 });
 
 watch(() => props.templateSrc, () => {
-  // When template changes, or on initial load for drawing1, reset history
   if (props.stage === 'drawing1' && ctx && drawingCanvasRef.value) {
-     clearDrawingCanvas(); // This also resets history
+     clearDrawingCanvas();
   }
 });
 
 watch(() => props.stage, (newStage) => {
     if ((newStage === 'drawing1' || newStage === 'drawing2') && ctx && drawingCanvasRef.value) {
-        // If moving to a drawing stage (e.g. after selecting template, or starting drawing 2)
-        // ensure history is appropriate for a new drawing session.
-        // clearDrawingCanvas() called by parent handles this for new templates/stages.
-        // If eraser was active, ensure it's reset to pen unless specified by prop
-        setEraserMode(props.isEraserActive);
-    }
-    if (newStage !== 'drawing1' && newStage !== 'drawing2') {
-        // When not in a drawing stage, ensure eraser is off if it was on.
-        // This might be better handled by App.vue resetting isEraserEnabled prop.
+        setEraserMode(props.isEraserActive); 
     }
 });
 
-
 function clearDrawingCanvas() {
   if (ctx && drawingCanvasRef.value) {
+    const originalGCO = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = 'source-over'; 
     ctx.clearRect(0, 0, drawingCanvasRef.value.width, drawingCanvasRef.value.height);
-    // Reset history on clear
+    ctx.globalCompositeOperation = originalGCO; 
+    
     canvasHistory.value = [drawingCanvasRef.value.toDataURL()]; 
-    historyPointer.value = 0; // Point to the initial blank state
+    historyPointer.value = 0; 
     emitUndoRedoState();
   }
 }
@@ -246,29 +221,29 @@ defineExpose({
   clearDrawingCanvas,
   getCanvasDataURL,
   displayCombinedDrawing, 
-  setEraserMode,
+  setEraserMode, 
   undo, 
   redo  
 });
 
 watch(() => props.isEraserActive, (newValue) => {
-  // console.log(`WATCH props.isEraserActive changed to: ${newValue}. Calling setEraserMode.`); // Removed log
   setEraserMode(newValue);
+});
+
+watch(() => props.currentBrushSize, () => { 
+  setEraserMode(props.isEraserActive); 
 });
 
 function setEraserMode(isErasing) {
   if (ctx) {
     if (isErasing) {
       ctx.globalCompositeOperation = 'destination-out';
-      ctx.lineWidth = 10; // Example: Eraser is thicker
-      // console.log('setEraserMode: ERASER active. gCO:', ctx.globalCompositeOperation, 'lineWidth:', ctx.lineWidth); // Removed log
+      ctx.strokeStyle = 'rgba(0,0,0,1)'; 
     } else {
       ctx.globalCompositeOperation = 'source-over';
-      ctx.lineWidth = 2; // Reset to default pen lineWidth
-      // console.log('setEraserMode: PEN active. gCO:', ctx.globalCompositeOperation, 'lineWidth:', ctx.lineWidth); // Removed log
+      ctx.strokeStyle = '#000000'; 
     }
-  } else {
-    // console.log('setEraserMode: ctx is null, cannot set mode.'); // Removed log
+    ctx.lineWidth = props.currentBrushSize;
   }
 }
 
@@ -282,6 +257,9 @@ function getCanvasDataURL() {
 async function displayCombinedDrawing(layers) {
   if (!ctx || !drawingCanvasRef.value) return;
   resizeCanvas(); 
+  
+  const originalGCO = ctx.globalCompositeOperation;
+  ctx.globalCompositeOperation = 'source-over';
   ctx.clearRect(0, 0, drawingCanvasRef.value.width, drawingCanvasRef.value.height);
   
   const loadImagePromise = (url) => new Promise((resolve, reject) => {
@@ -289,7 +267,7 @@ async function displayCombinedDrawing(layers) {
     const img = new Image();
     img.crossOrigin = 'Anonymous';
     img.onload = () => resolve(img);
-    img.onerror = (err) => { console.error('Error loading image for combined display:', url, err); reject(err); };
+    img.onerror = () => reject(new Error(`Failed to load image for combined display: ${url}`));
     img.src = url;
   });
 
@@ -310,41 +288,37 @@ async function displayCombinedDrawing(layers) {
 
   try {
     const imagesToLoad = [];
-    if (layers.template && layers.template.show && layers.template.url) {
-      imagesToLoad.push(loadImagePromise(layers.template.url).then(img => ({ type: 'template', img, opacity: layers.template.opacity })));
-    }
-    if (layers.drawing1 && layers.drawing1.show && layers.drawing1.url) {
-      imagesToLoad.push(loadImagePromise(layers.drawing1.url).then(img => ({ type: 'drawing1', img, opacity: layers.drawing1.opacity })));
-    }
-    if (layers.drawing2 && layers.drawing2.show && layers.drawing2.url) {
-      imagesToLoad.push(loadImagePromise(layers.drawing2.url).then(img => ({ type: 'drawing2', img, opacity: layers.drawing2.opacity })));
-    }
+    if (layers.template?.show && layers.template.url) imagesToLoad.push(loadImagePromise(layers.template.url).then(img => ({ type: 'template', img, opacity: layers.template.opacity })));
+    if (layers.drawing1?.show && layers.drawing1.url) imagesToLoad.push(loadImagePromise(layers.drawing1.url).then(img => ({ type: 'drawing1', img, opacity: layers.drawing1.opacity })));
+    if (layers.drawing2?.show && layers.drawing2.url) imagesToLoad.push(loadImagePromise(layers.drawing2.url).then(img => ({ type: 'drawing2', img, opacity: layers.drawing2.opacity })));
 
     const loadedImages = await Promise.all(imagesToLoad);
     const drawOrder = ['template', 'drawing1', 'drawing2']; 
 
     drawOrder.forEach(type => {
       const layer = loadedImages.find(l => l && l.type === type);
-      if (layer && layer.img) {
-        drawImageWithOpacity(layer.img, layer.opacity);
-      }
+      if (layer?.img) drawImageWithOpacity(layer.img, layer.opacity);
     });
-
   } catch (error) {
     console.error("Error displaying combined drawing:", error);
+  } finally {
+    ctx.globalCompositeOperation = originalGCO; 
+    setEraserMode(props.isEraserActive); 
   }
 }
-
 </script>
 
 <style scoped>
 #drawingArea {
   position: relative;
-  border: 1px solid black;
-  width: 500px; /* Example width, should match global or be configurable */
-  height: 400px; /* Example height, should match global or be configurable */
+  border: 1px solid black; 
+  width: 100%; 
+  max-width: 500px; 
+  height: 400px; 
+  margin-left: auto;
+  margin-right: auto;
   margin-bottom: 20px;
-  background-color: white; /* Added for testing eraser visibility */
+  background-color: white; 
 }
 
 #templateImage {

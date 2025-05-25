@@ -66,7 +66,7 @@ const overallAverageTime = computed(() => {
 #comparisonArea {
   margin-top: 20px;
   width: 100%;
-  max-width: 800px;
+  max-width: 800px; /* Reverted from 500px */
   display: flex;
   flex-direction: column; /* Ensure sets stack vertically */
   align-items: center; /* Center content like the header row */
