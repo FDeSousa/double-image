@@ -111,7 +111,7 @@ let bgCtx = null;
 let indicatorCtx = null;
 
 const MIN_BRUSH_SIZE = 1;
-const MAX_BRUSH_SIZE = 10; // Corrected MAX_BRUSH_SIZE
+const MAX_BRUSH_SIZE = 10;
 
 function triggerFileInput() {
   templateFileInputRef.value?.click();
@@ -132,28 +132,28 @@ function selectTool(tool) {
   }
 }
 
-function onBrushSizeChange(event) { // This function is now used
+function onBrushSizeChange(event) {
   let newSize = parseInt(event.target.value, 10);
-  // Ensure value stays within new min/max if somehow slider emits outside range
   newSize = Math.max(MIN_BRUSH_SIZE, Math.min(newSize, MAX_BRUSH_SIZE)); 
   emit('set-brush-size', newSize);
 }
 
 function drawPestleBackground() {
-  if (!bgCtx || !pestleBackgroundCanvas.value) return;
+  if (!bgCtx || !pestleBackgroundCanvas.value) {
+    console.error('drawPestleBackground: No context or canvas ref.');
+    return;
+  }
   const canvas = pestleBackgroundCanvas.value;
   const ctx = bgCtx;
   const width = canvas.width;
   const height = canvas.height;
-  
-  ctx.clearRect(0, 0, width, height);
+  console.log('drawPestleBackground called. Theme:', props.currentTheme);
 
+  ctx.clearRect(0, 0, width, height);
   const xPadding = 5; 
   const yCenter = height / 2;
-
-  // Adjusted radii for MAX_BRUSH_SIZE = 10
-  const pestleMinDisplayRadius = Math.max(1, MIN_BRUSH_SIZE / 2) + 2; // e.g., 1/2 + 2 = 2.5
-  const pestleMaxDisplayRadius = Math.min(height / 2 * 0.9, MAX_BRUSH_SIZE / 2 + 2) ; // e.g., min(22.5, 5 + 2) = 7
+  const pestleMinDisplayRadius = Math.max(1, MIN_BRUSH_SIZE / 2) + 2; 
+  const pestleMaxDisplayRadius = Math.min(height / 2 * 0.9, MAX_BRUSH_SIZE / 2 + 2) ; 
 
   const leftCapCenterX = xPadding + pestleMinDisplayRadius;
   const rightCapCenterX = width - xPadding - pestleMaxDisplayRadius;
@@ -169,16 +169,19 @@ function drawPestleBackground() {
 }
 
 function updateBrushPreview() {
-  if (!indicatorCtx || !brushIndicatorCanvas.value) return;
+  if (!indicatorCtx || !brushIndicatorCanvas.value) {
+    console.error('updateBrushPreview: No context or canvas ref.');
+    return;
+  }
   const canvas = brushIndicatorCanvas.value;
   const ctx = indicatorCtx;
   const width = canvas.width;
   const height = canvas.height;
   const currentSize = props.currentBrushSize;
+  console.log('updateBrushPreview called. Size:', currentSize);
 
   ctx.clearRect(0, 0, width, height);
 
-  // Ensure percent is 0 if min and max are the same (to avoid division by zero)
   const range = MAX_BRUSH_SIZE - MIN_BRUSH_SIZE;
   const percent = range === 0 ? 0 : (currentSize - MIN_BRUSH_SIZE) / range;
   
@@ -191,7 +194,7 @@ function updateBrushPreview() {
   const currentCircleTrackEndX = width - trackPadding - visualRadius;
   
   let circleCenterX = currentCircleTrackStartX;
-  if (currentCircleTrackEndX > currentCircleTrackStartX) { // Avoid issues if track length is zero or negative
+  if (currentCircleTrackEndX > currentCircleTrackStartX) {
     circleCenterX = currentCircleTrackStartX + percent * (currentCircleTrackEndX - currentCircleTrackStartX);
   }
   const circleCenterY = height / 2;
@@ -205,54 +208,62 @@ function updateBrushPreview() {
 }
 
 function setupPreviewCanvases() {
+  console.log(`setupPreviewCanvases called for stage: ${props.currentStage}. Refs: bg=${!!pestleBackgroundCanvas.value}, ind=${!!brushIndicatorCanvas.value}`);
+  
   if (pestleBackgroundCanvas.value) {
-    if (!bgCtx) { 
-        bgCtx = pestleBackgroundCanvas.value.getContext('2d');
-    }
+    bgCtx = pestleBackgroundCanvas.value.getContext('2d'); // Always re-get context
+    console.log('bgCtx re-initialized:', !!bgCtx);
     if (bgCtx) drawPestleBackground();
+    else console.error('Failed to get pestleBackgroundCanvas context in setup.');
+  } else {
+    console.error('pestleBackgroundCanvas ref is null in setupPreviewCanvases.');
   }
 
   if (brushIndicatorCanvas.value) {
-    if (!indicatorCtx) { 
-        indicatorCtx = brushIndicatorCanvas.value.getContext('2d');
-    }
+    indicatorCtx = brushIndicatorCanvas.value.getContext('2d'); // Always re-get context
+    console.log('indicatorCtx re-initialized:', !!indicatorCtx);
     if (indicatorCtx) updateBrushPreview();
+    else console.error('Failed to get brushIndicatorCanvas context in setup.');
+  } else {
+    console.error('brushIndicatorCanvas ref is null in setupPreviewCanvases.');
   }
 }
 
 onMounted(() => {
+  console.log(`MainControls onMounted. Initial stage: ${props.currentStage}`);
   if (props.currentStage === 'drawing1' || props.currentStage === 'drawing2') {
     nextTick(() => {
+        console.log('onMounted: Attempting setupPreviewCanvases after nextTick.');
         setupPreviewCanvases();
     });
   }
 });
 
 watch(() => props.currentBrushSize, (newSize) => {
-  // Ensure currentBrushSize prop is within new MIN/MAX_BRUSH_SIZE for safety,
-  // though onBrushSizeChange should already handle this.
-  const clampedSize = Math.max(MIN_BRUSH_SIZE, Math.min(newSize, MAX_BRUSH_SIZE));
-  if (indicatorCtx && props.currentBrushSize === clampedSize) { // Check if it's already clamped by parent
+  console.log('Watched currentBrushSize changed to:', newSize);
+  if (indicatorCtx) { 
     updateBrushPreview();
-  } else if (props.currentBrushSize !== clampedSize) {
-    // If the prop somehow got outside the new range, emit an update.
-    // This case should ideally not happen if App.vue also respects the new max.
-    // For now, just log if this happens. The slider itself is capped at 10.
-    // console.warn(`currentBrushSize prop (${newSize}) is outside new range [${MIN_BRUSH_SIZE}-${MAX_BRUSH_SIZE}]`);
+  } else {
+    console.warn('indicatorCtx not ready in currentBrushSize watcher.');
   }
 });
 
-watch(() => props.currentTheme, () => {
+watch(() => props.currentTheme, (newTheme) => {
+  console.log('Watched currentTheme changed to:', newTheme);
   if (bgCtx && indicatorCtx) { 
     drawPestleBackground(); 
     updateBrushPreview();   
+  } else {
+    console.warn('Contexts not ready in currentTheme watcher.');
   }
 });
 
-watch(() => props.currentStage, async (newStage) => {
+watch(() => props.currentStage, async (newStage, oldStage) => {
+  console.log(`Watched currentStage changed from ${oldStage} to: ${newStage}`);
   if ((newStage === 'drawing1' || newStage === 'drawing2')) {
     await nextTick(); 
-    setupPreviewCanvases();
+    console.log('Stage changed to drawing, attempting to setup/redraw preview canvases via nextTick.');
+    setupPreviewCanvases(); // This will re-get contexts and redraw
   }
 });
 </script>
