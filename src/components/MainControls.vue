@@ -24,10 +24,11 @@
     
     <!-- Drawing Tools: visible during drawing1 or drawing2 -->
     <template v-if="props.currentStage === 'drawing1' || props.currentStage === 'drawing2'">
-      <div class="drawing-tools-group">
-        <button 
-          id="penBtn"
-          @click="selectTool('pen')"
+      <div class="drawing-tools-super-group"> <!-- New overall container -->
+        <div class="primary-drawing-tools"> <!-- Group for pen, eraser, slider -->
+          <button 
+            id="penBtn"
+            @click="selectTool('pen')"
           :class="{ 'active': !props.isEraserEnabled }"
           aria-label="Select Pen Tool"
           title="Pen Tool"
@@ -63,10 +64,13 @@
           />
           <span aria-hidden="true">{{ props.currentBrushSize }}</span>
         </div>
-        <button id="undoBtn" @click="emit('undo-drawing')" :disabled="!props.canUndo" title="Undo" class="tool-button icon-only">↩️</button>
-        <button id="redoBtn" @click="emit('redo-drawing')" :disabled="!props.canRedo" title="Redo" class="tool-button icon-only">↪️</button>
-        <button id="clearCurrentBtn" @click="emit('clear-drawing')" title="Clear Current Drawing" class="tool-button icon-only">🗑️</button>
-      </div>
+        </div> <!-- End of primary-drawing-tools -->
+        <div class="action-drawing-tools"> <!-- Group for undo, redo, clear -->
+          <button id="undoBtn" @click="emit('undo-drawing')" :disabled="!props.canUndo" title="Undo" class="tool-button icon-only">↩️</button>
+          <button id="redoBtn" @click="emit('redo-drawing')" :disabled="!props.canRedo" title="Redo" class="tool-button icon-only">↪️</button>
+          <button id="clearCurrentBtn" @click="emit('clear-drawing')" title="Clear Current Drawing" class="tool-button icon-only">🗑️</button>
+        </div> <!-- End of action-drawing-tools -->
+      </div> <!-- End of drawing-tools-super-group -->
     </template>
 
     <button id="restartBtn" v-if="['drawing1', 'readyForDrawing2', 'drawing2', 'compared'].includes(props.currentStage) && props.currentStage !== 'initial'" @click="emit('restart-process')">Restart Pair</button>
@@ -139,15 +143,12 @@ function onBrushSizeChange(event) {
 }
 
 function drawPestleBackground() {
-  if (!bgCtx || !pestleBackgroundCanvas.value) {
-    console.error('drawPestleBackground: No context or canvas ref.');
-    return;
-  }
+  if (!bgCtx || !pestleBackgroundCanvas.value) return;
   const canvas = pestleBackgroundCanvas.value;
   const ctx = bgCtx;
   const width = canvas.width;
   const height = canvas.height;
-  console.log('drawPestleBackground called. Theme:', props.currentTheme);
+  // console.log('drawPestleBackground called. Theme:', props.currentTheme); // Debug
 
   ctx.clearRect(0, 0, width, height);
   const xPadding = 5; 
@@ -169,16 +170,13 @@ function drawPestleBackground() {
 }
 
 function updateBrushPreview() {
-  if (!indicatorCtx || !brushIndicatorCanvas.value) {
-    console.error('updateBrushPreview: No context or canvas ref.');
-    return;
-  }
+  if (!indicatorCtx || !brushIndicatorCanvas.value) return;
   const canvas = brushIndicatorCanvas.value;
   const ctx = indicatorCtx;
   const width = canvas.width;
   const height = canvas.height;
   const currentSize = props.currentBrushSize;
-  console.log('updateBrushPreview called. Size:', currentSize);
+  // console.log('updateBrushPreview called. Size:', currentSize); // Debug
 
   ctx.clearRect(0, 0, width, height);
 
@@ -208,62 +206,60 @@ function updateBrushPreview() {
 }
 
 function setupPreviewCanvases() {
-  console.log(`setupPreviewCanvases called for stage: ${props.currentStage}. Refs: bg=${!!pestleBackgroundCanvas.value}, ind=${!!brushIndicatorCanvas.value}`);
+  // console.log(`setupPreviewCanvases called for stage: ${props.currentStage}. Refs: bg=${!!pestleBackgroundCanvas.value}, ind=${!!brushIndicatorCanvas.value}`); // Debug
   
   if (pestleBackgroundCanvas.value) {
-    bgCtx = pestleBackgroundCanvas.value.getContext('2d'); // Always re-get context
-    console.log('bgCtx re-initialized:', !!bgCtx);
+    bgCtx = pestleBackgroundCanvas.value.getContext('2d'); 
+    // console.log('bgCtx re-initialized:', !!bgCtx); // Debug
     if (bgCtx) drawPestleBackground();
-    else console.error('Failed to get pestleBackgroundCanvas context in setup.');
-  } else {
-    console.error('pestleBackgroundCanvas ref is null in setupPreviewCanvases.');
+    // else console.error('Failed to get pestleBackgroundCanvas context in setup.'); // Debug
+  } else if (props.currentStage === 'drawing1' || props.currentStage === 'drawing2') { // Log error only if expected to be visible
+    console.error('pestleBackgroundCanvas ref is null in setupPreviewCanvases when it should be visible.');
   }
 
   if (brushIndicatorCanvas.value) {
-    indicatorCtx = brushIndicatorCanvas.value.getContext('2d'); // Always re-get context
-    console.log('indicatorCtx re-initialized:', !!indicatorCtx);
+    indicatorCtx = brushIndicatorCanvas.value.getContext('2d'); 
+    // console.log('indicatorCtx re-initialized:', !!indicatorCtx); // Debug
     if (indicatorCtx) updateBrushPreview();
-    else console.error('Failed to get brushIndicatorCanvas context in setup.');
-  } else {
-    console.error('brushIndicatorCanvas ref is null in setupPreviewCanvases.');
+    // else console.error('Failed to get brushIndicatorCanvas context in setup.'); // Debug
+  } else if (props.currentStage === 'drawing1' || props.currentStage === 'drawing2') { // Log error only if expected to be visible
+    console.error('brushIndicatorCanvas ref is null in setupPreviewCanvases when it should be visible.');
   }
 }
 
 onMounted(() => {
-  console.log(`MainControls onMounted. Initial stage: ${props.currentStage}`);
+  // console.log(`MainControls onMounted. Initial stage: ${props.currentStage}`); // Debug
   if (props.currentStage === 'drawing1' || props.currentStage === 'drawing2') {
     nextTick(() => {
-        console.log('onMounted: Attempting setupPreviewCanvases after nextTick.');
+        // console.log('onMounted: Attempting setupPreviewCanvases after nextTick.'); // Debug
         setupPreviewCanvases();
     });
   }
 });
 
-watch(() => props.currentBrushSize, (newSize) => {
-  console.log('Watched currentBrushSize changed to:', newSize);
+watch(() => props.currentBrushSize, () => { // Removed newSize as it's not used
+  // console.log('Watched currentBrushSize changed to:', props.currentBrushSize); // Debug
   if (indicatorCtx) { 
     updateBrushPreview();
-  } else {
-    console.warn('indicatorCtx not ready in currentBrushSize watcher.');
-  }
+  } 
+  // else { // console.warn('indicatorCtx not ready in currentBrushSize watcher.');} // Debug
 });
 
-watch(() => props.currentTheme, (newTheme) => {
-  console.log('Watched currentTheme changed to:', newTheme);
+watch(() => props.currentTheme, () => { // Removed newTheme as it's not used
+  // console.log('Watched currentTheme changed to:', props.currentTheme); // Debug
   if (bgCtx && indicatorCtx) { 
     drawPestleBackground(); 
     updateBrushPreview();   
-  } else {
-    console.warn('Contexts not ready in currentTheme watcher.');
-  }
+  } 
+  // else { // console.warn('Contexts not ready in currentTheme watcher.');} // Debug
 });
 
-watch(() => props.currentStage, async (newStage, oldStage) => {
-  console.log(`Watched currentStage changed from ${oldStage} to: ${newStage}`);
+watch(() => props.currentStage, async (newStage) => { // Removed unused oldStage
+  // console.log(`Watched currentStage changed to: ${newStage}`); // Debug
   if ((newStage === 'drawing1' || newStage === 'drawing2')) {
     await nextTick(); 
-    console.log('Stage changed to drawing, attempting to setup/redraw preview canvases via nextTick.');
-    setupPreviewCanvases(); // This will re-get contexts and redraw
+    // console.log('Stage changed to drawing, attempting to setup/redraw preview canvases via nextTick.'); // Debug
+    setupPreviewCanvases(); 
   }
 });
 </script>
@@ -281,24 +277,36 @@ watch(() => props.currentStage, async (newStage, oldStage) => {
   margin-left: auto;
   margin-right: auto;
   padding: 10px;
-  box-sizing: border-box; /* Include padding in width calculation */
+  box-sizing: border-box; 
 }
 
-.drawing-tools-group {
+.drawing-tools-super-group {
   display: flex;
-  flex-wrap: wrap; /* Allow tools to wrap if needed */
-  gap: 10px;
-  align-items: center;
-  justify-content: center;
-  width: 100%; /* Take full width to allow internal wrapping */
-  padding: 5px 0; /* Add some padding if tools wrap to new line */
-  border-top: 1px solid var(--border-color-light); /* Separator if on new line */
-  margin-top: 10px; /* Separator if on new line */
+  flex-direction: column; /* Stack primary and action tools vertically */
+  align-items: center; /* Center the groups */
+  width: 100%;
+  gap: 10px; /* Gap between primary and action tool groups */
+  padding: 5px 0; 
+  border-top: 1px solid var(--border-color-light); 
+  margin-top: 10px; 
 }
 
-body.dark-mode .drawing-tools-group {
+body.dark-mode .drawing-tools-super-group {
   border-top-color: var(--border-color-dark);
 }
+
+.primary-drawing-tools,
+.action-drawing-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  width: 100%; /* Allow internal items to use full width for wrapping */
+}
+
+/* Remove border-top from the old .drawing-tools-group if it's no longer needed or repurpose */
+/* For now, the border is on .drawing-tools-super-group */
 
 
 /* General button styling */
@@ -322,13 +330,15 @@ body.dark-mode .drawing-tools-group {
   flex-basis: 120px; 
 }
 
-.drawing-tools-group button.tool-button.icon-only {
-  min-width: 40px; /* Compact width for icon-only */
-  width: 40px;   /* Fixed width for icon-only */
-  padding: 8px;  /* Adjust padding for icons */
-  font-size: 1.2em; /* Make icons a bit larger if needed */
-  flex-grow: 0; /* Don't allow icon buttons to grow excessively */
-  flex-basis: auto; /* Reset flex-basis for icon buttons */
+/* Style for icon-only buttons in both primary and action tool groups */
+.primary-drawing-tools .tool-button.icon-only,
+.action-drawing-tools .tool-button.icon-only {
+  min-width: 40px; 
+  width: 40px;   
+  padding: 8px;  
+  font-size: 1.2em; 
+  flex-grow: 0; /* Prevent these buttons from growing */
+  flex-basis: 40px; /* Set a fixed basis */
 }
 
 
