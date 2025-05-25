@@ -24,53 +24,50 @@
     
     <!-- Drawing Tools: visible during drawing1 or drawing2 -->
     <template v-if="props.currentStage === 'drawing1' || props.currentStage === 'drawing2'">
-      <div class="drawing-tools-super-group"> <!-- New overall container -->
-        <div class="primary-drawing-tools"> <!-- Group for pen, eraser, slider -->
+      <div class="drawing-tools-super-group">
+        <div class="primary-drawing-tools">
           <button 
             id="penBtn"
             @click="selectTool('pen')"
-          :class="{ 'active': !props.isEraserEnabled }"
-          aria-label="Select Pen Tool"
-          title="Pen Tool"
-          class="tool-button icon-only"
-        >
-          ✏️
-        </button>
-        <button 
-          id="eraserBtn" 
-          @click="selectTool('eraser')" 
-          :class="{ 'active': props.isEraserEnabled }"
-          aria-label="Select Eraser Tool"
-          title="Eraser Tool"
-          class="tool-button icon-only"
-        >
-          🧼
-        </button>
-        <div class="slider-container">
-          <label for="brushSizeSlider" class="sr-only">Size:</label> 
-          <div class="brush-preview-wrapper">
-            <canvas ref="pestleBackgroundCanvas" width="100" height="50" class="pestle-bg"></canvas>
-            <canvas ref="brushIndicatorCanvas" width="100" height="50" class="brush-indicator"></canvas>
+            :class="{ 'active': !props.isEraserEnabled }"
+            aria-label="Select Pen Tool"
+            title="Pen Tool"
+            class="tool-button icon-only"
+          >
+            ✏️
+          </button>
+          <button 
+            id="eraserBtn" 
+            @click="selectTool('eraser')" 
+            :class="{ 'active': props.isEraserEnabled }"
+            aria-label="Select Eraser Tool"
+            title="Eraser Tool"
+            class="tool-button icon-only"
+          >
+            🧼
+          </button>
+          <div class="slider-container">
+            <label for="brushSizeSlider" class="sr-only">Brush Size Control:</label>
+            <div class="brush-preview-wrapper" ref="previewWrapperRef" tabindex="0" 
+                 @mousedown="handlePreviewMouseDown"
+                 @touchstart.prevent="handlePreviewTouchStart"
+                 aria-label="Brush size slider" role="slider"
+                 :aria-valuenow="props.currentBrushSize"
+                 :aria-valuemin="MIN_BRUSH_SIZE"
+                 :aria-valuemax="MAX_BRUSH_SIZE"
+            >
+              <canvas ref="pestleBackgroundCanvas" width="100" height="50" class="pestle-bg"></canvas>
+              <canvas ref="brushIndicatorCanvas" width="100" height="50" class="brush-indicator"></canvas>
+            </div>
+            <span aria-hidden="true">{{ props.currentBrushSize }}</span>
           </div>
-          <input 
-            type="range" 
-            id="brushSizeSlider" 
-            min="1" 
-            max="10"
-            :value="props.currentBrushSize" 
-            @input="onBrushSizeChange"
-            aria-label="Brush Size"
-            title="Brush Size"
-          />
-          <span aria-hidden="true">{{ props.currentBrushSize }}</span>
-        </div>
-        </div> <!-- End of primary-drawing-tools -->
-        <div class="action-drawing-tools"> <!-- Group for undo, redo, clear -->
+        </div> 
+        <div class="action-drawing-tools"> 
           <button id="undoBtn" @click="emit('undo-drawing')" :disabled="!props.canUndo" title="Undo" class="tool-button icon-only">↩️</button>
           <button id="redoBtn" @click="emit('redo-drawing')" :disabled="!props.canRedo" title="Redo" class="tool-button icon-only">↪️</button>
           <button id="clearCurrentBtn" @click="emit('clear-drawing')" title="Clear Current Drawing" class="tool-button icon-only">🗑️</button>
-        </div> <!-- End of action-drawing-tools -->
-      </div> <!-- End of drawing-tools-super-group -->
+        </div> 
+      </div> 
     </template>
 
     <button id="restartBtn" v-if="['drawing1', 'readyForDrawing2', 'drawing2', 'compared'].includes(props.currentStage) && props.currentStage !== 'initial'" @click="emit('restart-process')">Restart Pair</button>
@@ -78,7 +75,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
 
 // eslint-disable-next-line no-undef
 const props = defineProps({
@@ -111,11 +108,13 @@ const emit = defineEmits([
 const templateFileInputRef = ref(null);
 const pestleBackgroundCanvas = ref(null);
 const brushIndicatorCanvas = ref(null);
+const previewWrapperRef = ref(null); 
 let bgCtx = null;
 let indicatorCtx = null;
 
 const MIN_BRUSH_SIZE = 1;
 const MAX_BRUSH_SIZE = 10;
+const isDraggingPreviewSize = ref(false);
 
 function triggerFileInput() {
   templateFileInputRef.value?.click();
@@ -136,20 +135,13 @@ function selectTool(tool) {
   }
 }
 
-function onBrushSizeChange(event) {
-  let newSize = parseInt(event.target.value, 10);
-  newSize = Math.max(MIN_BRUSH_SIZE, Math.min(newSize, MAX_BRUSH_SIZE)); 
-  emit('set-brush-size', newSize);
-}
-
 function drawPestleBackground() {
   if (!bgCtx || !pestleBackgroundCanvas.value) return;
   const canvas = pestleBackgroundCanvas.value;
   const ctx = bgCtx;
   const width = canvas.width;
   const height = canvas.height;
-  // console.log('drawPestleBackground called. Theme:', props.currentTheme); // Debug
-
+  
   ctx.clearRect(0, 0, width, height);
   const xPadding = 5; 
   const yCenter = height / 2;
@@ -176,10 +168,8 @@ function updateBrushPreview() {
   const width = canvas.width;
   const height = canvas.height;
   const currentSize = props.currentBrushSize;
-  // console.log('updateBrushPreview called. Size:', currentSize); // Debug
 
   ctx.clearRect(0, 0, width, height);
-
   const range = MAX_BRUSH_SIZE - MIN_BRUSH_SIZE;
   const percent = range === 0 ? 0 : (currentSize - MIN_BRUSH_SIZE) / range;
   
@@ -199,66 +189,130 @@ function updateBrushPreview() {
 
   ctx.beginPath();
   ctx.arc(circleCenterX, circleCenterY, visualRadius, 0, 2 * Math.PI);
-  
   ctx.strokeStyle = props.currentTheme === 'dark' ? 'rgba(236, 240, 241, 0.8)' : 'rgba(0, 0, 0, 0.8)'; 
   ctx.lineWidth = strokeWidth;
   ctx.stroke();
 }
 
-function setupPreviewCanvases() {
-  // console.log(`setupPreviewCanvases called for stage: ${props.currentStage}. Refs: bg=${!!pestleBackgroundCanvas.value}, ind=${!!brushIndicatorCanvas.value}`); // Debug
+function updateSizeFromEvent(event, isTouchEvent = false) {
+  if (!previewWrapperRef.value) return;
   
+  const interactiveElement = previewWrapperRef.value;
+  const rect = interactiveElement.getBoundingClientRect();
+  const clientX = isTouchEvent ? event.touches[0].clientX : event.clientX;
+  let relativeX = clientX - rect.left;
+
+  const xPadding = 5; 
+  const canvasDisplayWidth = 100; 
+  const trackStartX = xPadding;
+  const trackEndX = canvasDisplayWidth - xPadding;
+  const trackWidth = trackEndX - trackStartX;
+
+  relativeX = Math.max(trackStartX, Math.min(relativeX, trackEndX));
+
+  let percent = 0;
+  if (trackWidth > 0) {
+    percent = (relativeX - trackStartX) / trackWidth;
+  }
+
+  const newRawSize = MIN_BRUSH_SIZE + percent * (MAX_BRUSH_SIZE - MIN_BRUSH_SIZE);
+  const newSize = Math.round(newRawSize);
+  const finalSize = Math.max(MIN_BRUSH_SIZE, Math.min(newSize, MAX_BRUSH_SIZE));
+
+  if (finalSize !== props.currentBrushSize) {
+    emit('set-brush-size', finalSize);
+  }
+}
+
+function handlePreviewMouseDown(event) {
+  isDraggingPreviewSize.value = true;
+  updateSizeFromEvent(event);
+  window.addEventListener('mousemove', handlePreviewMouseMove);
+  window.addEventListener('mouseup', handlePreviewMouseUp);
+}
+
+function handlePreviewMouseMove(event) {
+  if (isDraggingPreviewSize.value) {
+    updateSizeFromEvent(event);
+  }
+}
+
+function handlePreviewMouseUp() {
+  if (isDraggingPreviewSize.value) {
+    isDraggingPreviewSize.value = false;
+    window.removeEventListener('mousemove', handlePreviewMouseMove);
+    window.removeEventListener('mouseup', handlePreviewMouseUp);
+  }
+}
+
+function handlePreviewTouchStart(event) {
+  isDraggingPreviewSize.value = true;
+  updateSizeFromEvent(event, true);
+  window.addEventListener('touchmove', handlePreviewTouchMove, { passive: false });
+  window.addEventListener('touchend', handlePreviewTouchEnd);
+  window.addEventListener('touchcancel', handlePreviewTouchEnd);
+}
+
+function handlePreviewTouchMove(event) {
+  if (isDraggingPreviewSize.value) {
+    event.preventDefault(); 
+    updateSizeFromEvent(event, true);
+  }
+}
+
+function handlePreviewTouchEnd() {
+  if (isDraggingPreviewSize.value) {
+    isDraggingPreviewSize.value = false;
+    window.removeEventListener('touchmove', handlePreviewTouchMove);
+    window.removeEventListener('touchend', handlePreviewTouchEnd);
+    window.removeEventListener('touchcancel', handlePreviewTouchEnd);
+  }
+}
+
+function setupPreviewCanvases() {
   if (pestleBackgroundCanvas.value) {
     bgCtx = pestleBackgroundCanvas.value.getContext('2d'); 
-    // console.log('bgCtx re-initialized:', !!bgCtx); // Debug
     if (bgCtx) drawPestleBackground();
-    // else console.error('Failed to get pestleBackgroundCanvas context in setup.'); // Debug
-  } else if (props.currentStage === 'drawing1' || props.currentStage === 'drawing2') { // Log error only if expected to be visible
-    console.error('pestleBackgroundCanvas ref is null in setupPreviewCanvases when it should be visible.');
+  } else if (props.currentStage === 'drawing1' || props.currentStage === 'drawing2') {
+    // console.error('pestleBackgroundCanvas ref is null in setupPreviewCanvases when it should be visible.');
   }
 
   if (brushIndicatorCanvas.value) {
     indicatorCtx = brushIndicatorCanvas.value.getContext('2d'); 
-    // console.log('indicatorCtx re-initialized:', !!indicatorCtx); // Debug
     if (indicatorCtx) updateBrushPreview();
-    // else console.error('Failed to get brushIndicatorCanvas context in setup.'); // Debug
-  } else if (props.currentStage === 'drawing1' || props.currentStage === 'drawing2') { // Log error only if expected to be visible
-    console.error('brushIndicatorCanvas ref is null in setupPreviewCanvases when it should be visible.');
+  } else if (props.currentStage === 'drawing1' || props.currentStage === 'drawing2') {
+    // console.error('brushIndicatorCanvas ref is null in setupPreviewCanvases when it should be visible.');
   }
 }
 
 onMounted(() => {
-  // console.log(`MainControls onMounted. Initial stage: ${props.currentStage}`); // Debug
   if (props.currentStage === 'drawing1' || props.currentStage === 'drawing2') {
-    nextTick(() => {
-        // console.log('onMounted: Attempting setupPreviewCanvases after nextTick.'); // Debug
-        setupPreviewCanvases();
-    });
+    nextTick(setupPreviewCanvases);
   }
 });
 
-watch(() => props.currentBrushSize, () => { // Removed newSize as it's not used
-  // console.log('Watched currentBrushSize changed to:', props.currentBrushSize); // Debug
-  if (indicatorCtx) { 
-    updateBrushPreview();
-  } 
-  // else { // console.warn('indicatorCtx not ready in currentBrushSize watcher.');} // Debug
+onUnmounted(() => {
+  window.removeEventListener('mousemove', handlePreviewMouseMove);
+  window.removeEventListener('mouseup', handlePreviewMouseUp);
+  window.removeEventListener('touchmove', handlePreviewTouchMove);
+  window.removeEventListener('touchend', handlePreviewTouchEnd);
+  window.removeEventListener('touchcancel', handlePreviewTouchEnd);
 });
 
-watch(() => props.currentTheme, () => { // Removed newTheme as it's not used
-  // console.log('Watched currentTheme changed to:', props.currentTheme); // Debug
+watch(() => props.currentBrushSize, () => {
+  if (indicatorCtx) updateBrushPreview();
+});
+
+watch(() => props.currentTheme, () => {
   if (bgCtx && indicatorCtx) { 
     drawPestleBackground(); 
     updateBrushPreview();   
-  } 
-  // else { // console.warn('Contexts not ready in currentTheme watcher.');} // Debug
+  }
 });
 
-watch(() => props.currentStage, async (newStage) => { // Removed unused oldStage
-  // console.log(`Watched currentStage changed to: ${newStage}`); // Debug
+watch(() => props.currentStage, async (newStage) => {
   if ((newStage === 'drawing1' || newStage === 'drawing2')) {
     await nextTick(); 
-    // console.log('Stage changed to drawing, attempting to setup/redraw preview canvases via nextTick.'); // Debug
     setupPreviewCanvases(); 
   }
 });
@@ -269,7 +323,7 @@ watch(() => props.currentStage, async (newStage) => { // Removed unused oldStage
   margin-bottom: 20px;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px; /* Consistent gap for all buttons/groups */
+  gap: 10px;
   align-items: center;
   justify-content: center;
   max-width: 500px; 
@@ -282,10 +336,10 @@ watch(() => props.currentStage, async (newStage) => { // Removed unused oldStage
 
 .drawing-tools-super-group {
   display: flex;
-  flex-direction: column; /* Stack primary and action tools vertically */
-  align-items: center; /* Center the groups */
+  flex-direction: column;
+  align-items: center;
   width: 100%;
-  gap: 10px; /* Gap between primary and action tool groups */
+  gap: 10px;
   padding: 5px 0; 
   border-top: 1px solid var(--border-color-light); 
   margin-top: 10px; 
@@ -302,19 +356,14 @@ body.dark-mode .drawing-tools-super-group {
   justify-content: center;
   align-items: center;
   gap: 10px;
-  width: 100%; /* Allow internal items to use full width for wrapping */
+  width: 100%;
 }
 
-/* Remove border-top from the old .drawing-tools-group if it's no longer needed or repurpose */
-/* For now, the border is on .drawing-tools-super-group */
-
-
-/* General button styling */
 .main-controls-container button {
   padding: 8px 12px; 
   cursor: pointer;
   width: auto; 
-  min-width: 120px; /* Default min-width for text buttons */
+  min-width: 120px;
   height: 40px; 
   text-align: center;
   box-sizing: border-box;
@@ -330,23 +379,19 @@ body.dark-mode .drawing-tools-super-group {
   flex-basis: 120px; 
 }
 
-/* Style for icon-only buttons in both primary and action tool groups */
 .primary-drawing-tools .tool-button.icon-only,
 .action-drawing-tools .tool-button.icon-only {
   min-width: 40px; 
   width: 40px;   
   padding: 8px;  
   font-size: 1.2em; 
-  flex-grow: 0; /* Prevent these buttons from growing */
-  flex-basis: 40px; /* Set a fixed basis */
+  flex-grow: 0; 
+  flex-basis: 40px; 
 }
 
-
-/* Specific width for workflow buttons can remain or be adjusted */
 #loadTemplateBtn, #pickPredefinedBtn, #save1Btn, #start2Btn, #save2Btn, #restartBtn {
    /* width: 160px; */ 
 }
-
 
 .main-controls-container button.active {
   background-color: var(--text-color-light);
@@ -376,36 +421,34 @@ body.dark-mode .main-controls-container button.active {
   align-items: center;
   gap: 8px;
   color: var(--text-color);
-  padding: 0 5px; /* Adjusted padding */
-  flex-grow: 0; /* Don't let slider container grow excessively, allow space for preview */
+  padding: 0 5px;
+  flex-grow: 0;
   justify-content: center;
-  margin-left: 10px; /* Space it from the preview */
+  /* margin-left: 10px; */ 
 }
 
 .brush-preview-wrapper {
   position: relative;
-  width: 100px; /* Match canvas width */
-  height: 50px; /* Match canvas height */
-  margin-right: 5px; /* Space between preview and slider input */
+  width: 100px; 
+  height: 50px; 
+  margin-right: 8px; 
+  cursor: ew-resize; 
+  touch-action: none; 
 }
 
 .brush-preview-wrapper canvas {
   position: absolute;
   top: 0;
   left: 0;
+  pointer-events: none; 
 }
 
 body.dark-mode .slider-container {
   color: var(--text-color-dark);
 }
 
-.slider-container input[type="range"] {
-  width: 100px; 
-  flex-shrink: 1; 
-}
-
 .slider-container span {
-  min-width: 35px; /* Space for "50px" */
+  min-width: 25px; 
   text-align: right;
 }
 
