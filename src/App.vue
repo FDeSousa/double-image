@@ -26,6 +26,7 @@
       :canUndo="canUndo"
       :canRedo="canRedo"
       :currentBrushSize="currentBrushSize"
+      :currentTheme="currentTheme"
       @toggle-thumbnails="handleToggleThumbnails"
       @save-drawing-1="handleSaveDrawing1"
       @start-drawing-2="handleStartDrawing2"

@@ -46,18 +46,22 @@
           🧼
         </button>
         <div class="slider-container">
-          <label for="brushSizeSlider" class="sr-only">Size:</label> <!-- Screen-reader only label -->
+          <label for="brushSizeSlider" class="sr-only">Size:</label> 
+          <div class="brush-preview-wrapper">
+            <canvas ref="pestleBackgroundCanvas" width="100" height="50" class="pestle-bg"></canvas>
+            <canvas ref="brushIndicatorCanvas" width="100" height="50" class="brush-indicator"></canvas>
+          </div>
           <input 
             type="range" 
             id="brushSizeSlider" 
             min="1" 
-            max="50" 
+            max="10"
             :value="props.currentBrushSize" 
             @input="onBrushSizeChange"
             aria-label="Brush Size"
             title="Brush Size"
           />
-          <span aria-hidden="true">{{ props.currentBrushSize }}px</span> <!-- Hide from screen reader, label is enough -->
+          <span aria-hidden="true">{{ props.currentBrushSize }}</span>
         </div>
         <button id="undoBtn" @click="emit('undo-drawing')" :disabled="!props.canUndo" title="Undo" class="tool-button icon-only">↩️</button>
         <button id="redoBtn" @click="emit('redo-drawing')" :disabled="!props.canRedo" title="Redo" class="tool-button icon-only">↪️</button>
@@ -65,13 +69,12 @@
       </div>
     </template>
 
-    <!-- Restart Pair: visible during drawing stages or after comparison, but not initial -->
     <button id="restartBtn" v-if="['drawing1', 'readyForDrawing2', 'drawing2', 'compared'].includes(props.currentStage) && props.currentStage !== 'initial'" @click="emit('restart-process')">Restart Pair</button>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted, watch, nextTick } from 'vue';
 
 // eslint-disable-next-line no-undef
 const props = defineProps({
@@ -82,7 +85,8 @@ const props = defineProps({
   currentBrushSize: {
     type: Number,
     default: 2
-  }
+  },
+  currentTheme: String
 });
 
 // eslint-disable-next-line no-undef
@@ -101,6 +105,13 @@ const emit = defineEmits([
 ]);
 
 const templateFileInputRef = ref(null);
+const pestleBackgroundCanvas = ref(null);
+const brushIndicatorCanvas = ref(null);
+let bgCtx = null;
+let indicatorCtx = null;
+
+const MIN_BRUSH_SIZE = 1;
+const MAX_BRUSH_SIZE = 10; // Corrected MAX_BRUSH_SIZE
 
 function triggerFileInput() {
   templateFileInputRef.value?.click();
@@ -121,9 +132,129 @@ function selectTool(tool) {
   }
 }
 
-function onBrushSizeChange(event) {
-  emit('set-brush-size', parseInt(event.target.value, 10));
+function onBrushSizeChange(event) { // This function is now used
+  let newSize = parseInt(event.target.value, 10);
+  // Ensure value stays within new min/max if somehow slider emits outside range
+  newSize = Math.max(MIN_BRUSH_SIZE, Math.min(newSize, MAX_BRUSH_SIZE)); 
+  emit('set-brush-size', newSize);
 }
+
+function drawPestleBackground() {
+  if (!bgCtx || !pestleBackgroundCanvas.value) return;
+  const canvas = pestleBackgroundCanvas.value;
+  const ctx = bgCtx;
+  const width = canvas.width;
+  const height = canvas.height;
+  
+  ctx.clearRect(0, 0, width, height);
+
+  const xPadding = 5; 
+  const yCenter = height / 2;
+
+  // Adjusted radii for MAX_BRUSH_SIZE = 10
+  const pestleMinDisplayRadius = Math.max(1, MIN_BRUSH_SIZE / 2) + 2; // e.g., 1/2 + 2 = 2.5
+  const pestleMaxDisplayRadius = Math.min(height / 2 * 0.9, MAX_BRUSH_SIZE / 2 + 2) ; // e.g., min(22.5, 5 + 2) = 7
+
+  const leftCapCenterX = xPadding + pestleMinDisplayRadius;
+  const rightCapCenterX = width - xPadding - pestleMaxDisplayRadius;
+
+  ctx.beginPath();
+  ctx.arc(leftCapCenterX, yCenter, pestleMinDisplayRadius, Math.PI * 0.5, Math.PI * 1.5, false);
+  ctx.lineTo(rightCapCenterX, yCenter - pestleMaxDisplayRadius);
+  ctx.arc(rightCapCenterX, yCenter, pestleMaxDisplayRadius, Math.PI * 1.5, Math.PI * 0.5, false);
+  ctx.closePath();
+  
+  ctx.fillStyle = props.currentTheme === 'dark' ? '#4a6177' : '#e0e0e0'; 
+  ctx.fill();
+}
+
+function updateBrushPreview() {
+  if (!indicatorCtx || !brushIndicatorCanvas.value) return;
+  const canvas = brushIndicatorCanvas.value;
+  const ctx = indicatorCtx;
+  const width = canvas.width;
+  const height = canvas.height;
+  const currentSize = props.currentBrushSize;
+
+  ctx.clearRect(0, 0, width, height);
+
+  // Ensure percent is 0 if min and max are the same (to avoid division by zero)
+  const range = MAX_BRUSH_SIZE - MIN_BRUSH_SIZE;
+  const percent = range === 0 ? 0 : (currentSize - MIN_BRUSH_SIZE) / range;
+  
+  const circleRadiusPx = currentSize / 2; 
+  const strokeWidth = 1.5; 
+  const visualRadius = Math.max(0.5, Math.min(circleRadiusPx, (height / 2) - strokeWidth));
+  const trackPadding = 5; 
+
+  const currentCircleTrackStartX = trackPadding + visualRadius;
+  const currentCircleTrackEndX = width - trackPadding - visualRadius;
+  
+  let circleCenterX = currentCircleTrackStartX;
+  if (currentCircleTrackEndX > currentCircleTrackStartX) { // Avoid issues if track length is zero or negative
+    circleCenterX = currentCircleTrackStartX + percent * (currentCircleTrackEndX - currentCircleTrackStartX);
+  }
+  const circleCenterY = height / 2;
+
+  ctx.beginPath();
+  ctx.arc(circleCenterX, circleCenterY, visualRadius, 0, 2 * Math.PI);
+  
+  ctx.strokeStyle = props.currentTheme === 'dark' ? 'rgba(236, 240, 241, 0.8)' : 'rgba(0, 0, 0, 0.8)'; 
+  ctx.lineWidth = strokeWidth;
+  ctx.stroke();
+}
+
+function setupPreviewCanvases() {
+  if (pestleBackgroundCanvas.value) {
+    if (!bgCtx) { 
+        bgCtx = pestleBackgroundCanvas.value.getContext('2d');
+    }
+    if (bgCtx) drawPestleBackground();
+  }
+
+  if (brushIndicatorCanvas.value) {
+    if (!indicatorCtx) { 
+        indicatorCtx = brushIndicatorCanvas.value.getContext('2d');
+    }
+    if (indicatorCtx) updateBrushPreview();
+  }
+}
+
+onMounted(() => {
+  if (props.currentStage === 'drawing1' || props.currentStage === 'drawing2') {
+    nextTick(() => {
+        setupPreviewCanvases();
+    });
+  }
+});
+
+watch(() => props.currentBrushSize, (newSize) => {
+  // Ensure currentBrushSize prop is within new MIN/MAX_BRUSH_SIZE for safety,
+  // though onBrushSizeChange should already handle this.
+  const clampedSize = Math.max(MIN_BRUSH_SIZE, Math.min(newSize, MAX_BRUSH_SIZE));
+  if (indicatorCtx && props.currentBrushSize === clampedSize) { // Check if it's already clamped by parent
+    updateBrushPreview();
+  } else if (props.currentBrushSize !== clampedSize) {
+    // If the prop somehow got outside the new range, emit an update.
+    // This case should ideally not happen if App.vue also respects the new max.
+    // For now, just log if this happens. The slider itself is capped at 10.
+    // console.warn(`currentBrushSize prop (${newSize}) is outside new range [${MIN_BRUSH_SIZE}-${MAX_BRUSH_SIZE}]`);
+  }
+});
+
+watch(() => props.currentTheme, () => {
+  if (bgCtx && indicatorCtx) { 
+    drawPestleBackground(); 
+    updateBrushPreview();   
+  }
+});
+
+watch(() => props.currentStage, async (newStage) => {
+  if ((newStage === 'drawing1' || newStage === 'drawing2')) {
+    await nextTick(); 
+    setupPreviewCanvases();
+  }
+});
 </script>
 
 <style scoped>
@@ -225,8 +356,22 @@ body.dark-mode .main-controls-container button.active {
   gap: 8px;
   color: var(--text-color);
   padding: 0 5px; /* Adjusted padding */
-  flex-grow: 1; /* Allow slider container to take available space */
+  flex-grow: 0; /* Don't let slider container grow excessively, allow space for preview */
   justify-content: center;
+  margin-left: 10px; /* Space it from the preview */
+}
+
+.brush-preview-wrapper {
+  position: relative;
+  width: 100px; /* Match canvas width */
+  height: 50px; /* Match canvas height */
+  margin-right: 5px; /* Space between preview and slider input */
+}
+
+.brush-preview-wrapper canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
 body.dark-mode .slider-container {
@@ -235,7 +380,7 @@ body.dark-mode .slider-container {
 
 .slider-container input[type="range"] {
   width: 100px; 
-  flex-shrink: 1; /* Allow slider to shrink if space is tight */
+  flex-shrink: 1; 
 }
 
 .slider-container span {
