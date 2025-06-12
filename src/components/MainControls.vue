@@ -102,7 +102,8 @@ const emit = defineEmits([
   'undo-drawing',
   'redo-drawing',
   'clear-drawing',
-  'set-brush-size'
+  'set-brush-size',
+  'set-brush-size-debug' // Declare the debug emit
 ]);
 
 const templateFileInputRef = ref(null);
@@ -219,6 +220,10 @@ function updateSizeFromEvent(event, isTouchEvent = false) {
   const newSize = Math.round(newRawSize);
   const finalSize = Math.max(MIN_BRUSH_SIZE, Math.min(newSize, MAX_BRUSH_SIZE));
 
+  // console.log(`[DEBUG] updateSizeFromEvent: finalSize=${finalSize}, props.currentBrushSize=${props.currentBrushSize}, condition=${finalSize !== props.currentBrushSize}`); // Debug line
+  
+  // emit('set-brush-size-debug', 'test-emit'); // REMOVE TEMPORARY DEBUG EMIT
+
   if (finalSize !== props.currentBrushSize) {
     emit('set-brush-size', finalSize);
   }
@@ -316,6 +321,9 @@ watch(() => props.currentStage, async (newStage) => {
     setupPreviewCanvases(); 
   }
 });
+
+// eslint-disable-next-line no-undef
+defineExpose({ isDraggingPreviewSize }); // Expose for testing
 </script>
 
 <style scoped>

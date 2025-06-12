@@ -84,6 +84,8 @@ import DrawingCanvas from './components/DrawingCanvas.vue';
 // import DrawingToolbar from './components/DrawingToolbar.vue'; // Removed
 import MainControls from './components/MainControls.vue'; // Added
 import ComparisonResults from './components/ComparisonResults.vue';
+import { calculateComparisonScores, performResemblanceAnalysis } from './utils/comparisonUtils.js'; 
+import { urlToImageData } from './utils/imageUtils.js'; // Added import
 
 const thumbnailPickerVisible = ref(false);
 const currentTemplateSrc = ref(null);
@@ -172,31 +174,7 @@ function handleSaveDrawing2() {
   }
 }
 
-async function urlToImageData(url) {
-  return new Promise((resolve, reject) => {
-    if (!url) reject(new Error("URL is null"));
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const targetWidth = drawingCanvasComponentRef.value?.drawingCanvasRef?.width || 500;
-      const targetHeight = drawingCanvasComponentRef.value?.drawingCanvasRef?.height || 400;
-      canvas.width = targetWidth;
-      canvas.height = targetHeight;
-      const ctx = canvas.getContext('2d');
-      const hRatio = targetWidth / img.naturalWidth;
-      const vRatio = targetHeight / img.naturalHeight;
-      const ratio = Math.min(hRatio, vRatio);
-      const centerShift_x = (targetWidth - img.naturalWidth * ratio) / 2;
-      const centerShift_y = (targetHeight - img.naturalHeight * ratio) / 2;
-      ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight,
-                    centerShift_x, centerShift_y, img.naturalWidth * ratio, img.naturalHeight * ratio);
-      resolve(ctx.getImageData(0, 0, targetWidth, targetHeight));
-    };
-    img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
-    img.src = url;
-  });
-}
+// urlToImageData function moved to imageUtils.js
 
 async function compareAndDisplayResults() {
   if (!drawing1DataURL.value || !drawing2DataURL.value || !currentTemplateSrc.value) return;
@@ -204,49 +182,47 @@ async function compareAndDisplayResults() {
     if (typeof window.resemble === 'undefined') {
       alert("Resemble.js not loaded."); return;
     }
+
+    // Get target dimensions from the drawing canvas for urlToImageData
+    const targetWidth = drawingCanvasComponentRef.value?.drawingCanvasRef?.width || 500;
+    const targetHeight = drawingCanvasComponentRef.value?.drawingCanvasRef?.height || 400;
+
     const [data1, data2, templateImgData] = await Promise.all([
-      urlToImageData(drawing1DataURL.value),
-      urlToImageData(drawing2DataURL.value),
-      urlToImageData(currentTemplateSrc.value)
+      urlToImageData(drawing1DataURL.value, targetWidth, targetHeight),
+      urlToImageData(drawing2DataURL.value, targetWidth, targetHeight),
+      urlToImageData(currentTemplateSrc.value, targetWidth, targetHeight)
     ]);
-    if (!data1 || !data2 || !templateImgData) return;
+    if (!data1 || !data2 || !templateImgData) {
+      console.error("Failed to get all necessary ImageData for comparison.");
+      return;
+    }
 
-    const comparisonPromises = [
-      new Promise(resolve => window.resemble(data1).compareTo(data2).onComplete(resolve)),
-      new Promise(resolve => window.resemble(data1).compareTo(templateImgData).onComplete(resolve)),
-      new Promise(resolve => window.resemble(data2).compareTo(templateImgData).onComplete(resolve))
-    ];
-    const results = await Promise.all(comparisonPromises);
-
-    const sim1vs2 = 100 - parseFloat(results[0].rawMisMatchPercentage);
-    const sim1vsT = 100 - parseFloat(results[1].rawMisMatchPercentage);
-    const sim2vsT = 100 - parseFloat(results[2].rawMisMatchPercentage);
-
-    const avgLikeness = (sim1vs2 + sim1vsT + sim2vsT) / 3;
-    const timeDiff = Math.abs(parseFloat(drawing1Time.value) - parseFloat(drawing2Time.value));
-    const timeEfficiencyK = 2;
-    const timeEfficiencyScore = Math.max(0, 100 - (timeDiff * timeEfficiencyK));
-    const weightLikeness = 0.7;
-    const weightTime = 0.3;
-    const overallScore = (weightLikeness * avgLikeness) + (weightTime * timeEfficiencyScore);
+    const results = await performResemblanceAnalysis(data1, data2, templateImgData);
+    
+    const scores = calculateComparisonScores(results, drawing1Time.value, drawing2Time.value);
 
     const newComparisonSet = {
       id: allComparisonResults.value.length, 
       drawing1URL: drawing1DataURL.value,
       drawing2URL: drawing2DataURL.value,
       templateURL: currentTemplateSrc.value,
-      sim1vs2: sim1vs2, sim1vsT: sim1vsT, sim2vsT: sim2vsT,
-      drawing1Time: drawing1Time.value, drawing2Time: drawing2Time.value,
-      avgLikeness: parseFloat(avgLikeness.toFixed(2)),
-      timeEfficiencyScore: parseFloat(timeEfficiencyScore.toFixed(2)),
-      overallScore: parseFloat(overallScore.toFixed(2))
+      sim1vs2: scores.sim1vs2, 
+      sim1vsT: scores.sim1vsT, 
+      sim2vsT: scores.sim2vsT,
+      drawing1Time: drawing1Time.value, 
+      drawing2Time: drawing2Time.value,
+      avgLikeness: scores.avgLikeness,
+      timeEfficiencyScore: scores.timeEfficiencyScore,
+      overallScore: scores.overallScore
     };
     allComparisonResults.value.push(newComparisonSet);
-    latestComparisonScores.value = {
-        sim1vs2: sim1vs2.toFixed(2), sim1vsT: sim1vsT.toFixed(2), sim2vsT: sim2vsT.toFixed(2),
-        avgLikeness: avgLikeness.toFixed(2),
-        timeEfficiencyScore: timeEfficiencyScore.toFixed(2),
-        overallScore: overallScore.toFixed(2)
+    latestComparisonScores.value = { // Keep .toFixed(2) for display consistency if needed
+        sim1vs2: scores.sim1vs2.toFixed(2), 
+        sim1vsT: scores.sim1vsT.toFixed(2), 
+        sim2vsT: scores.sim2vsT.toFixed(2),
+        avgLikeness: scores.avgLikeness.toFixed(2),
+        timeEfficiencyScore: scores.timeEfficiencyScore.toFixed(2),
+        overallScore: scores.overallScore.toFixed(2)
     };
     saveResultsToLocalStorage();
     if (drawingCanvasComponentRef.value) {
@@ -349,6 +325,15 @@ function loadThemeFromLocalStorage() {
 onMounted(() => {
   loadResultsFromLocalStorage();
   loadThemeFromLocalStorage();
+});
+
+// eslint-disable-next-line no-undef
+defineExpose({ // For testing purposes
+  loadResultsFromLocalStorage,
+  loadThemeFromLocalStorage,
+  compareAndDisplayResults, // Already needed for a spy
+  // Expose refs if needed for direct assertion in tests, e.g.:
+  // currentTemplateSrc, stage, drawing1DataURL, drawing2DataURL 
 });
 </script>
 

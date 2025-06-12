@@ -31,7 +31,7 @@ const emit = defineEmits(['undo-state-changed']);
 
 const drawingCanvasRef = ref(null);
 let ctx = null;
-let isDrawing = false;
+const isDrawing = ref(false); // Changed to ref
 let lastX = 0;
 let lastY = 0;
 
@@ -77,8 +77,13 @@ function getCoords(e) {
   const clientX = e.touches ? e.touches[0].clientX : e.clientX;
   const clientY = e.touches ? e.touches[0].clientY : e.clientY;
   
-  const x = (clientX - rect.left) * scaleX;
-  const y = (clientY - rect.top) * scaleY;
+  let x = 0;
+  let y = 0;
+
+  if (typeof clientX === 'number' && typeof clientY === 'number') {
+    x = (clientX - rect.left) * scaleX;
+    y = (clientY - rect.top) * scaleY;
+  }
 
   return { x, y };
 }
@@ -89,7 +94,7 @@ function startDrawing(e) {
 
   setEraserMode(props.isEraserActive); 
 
-  isDrawing = true;
+  isDrawing.value = true; // Use .value
   const coords = getCoords(e);
   [lastX, lastY] = [coords.x, coords.y];
   ctx.beginPath(); 
@@ -98,7 +103,7 @@ function startDrawing(e) {
 }
 
 function draw(e) {
-  if (!isDrawing || !ctx) return;
+  if (!isDrawing.value || !ctx) return; // Use .value
   const coords = getCoords(e);
   ctx.lineTo(coords.x, coords.y);
   
@@ -110,8 +115,8 @@ function draw(e) {
 }
 
 function stopDrawing() {
-  if (!isDrawing) return;
-  isDrawing = false;
+  if (!isDrawing.value) return; // Use .value
+  isDrawing.value = false; // Use .value
   if (props.stage === 'drawing1' || props.stage === 'drawing2') {
     saveHistoryState();
   }
@@ -223,7 +228,15 @@ defineExpose({
   displayCombinedDrawing, 
   setEraserMode, 
   undo, 
-  redo  
+  redo,
+  getCoords, // Expose getCoords for testing
+  resizeCanvas, // Expose resizeCanvas for testing
+  saveHistoryState, // Expose for testing
+  startDrawing, // Expose for testing
+  draw, // Expose for testing
+  stopDrawing, // Expose for testing
+  getComponentContext: () => ctx, // TEMPORARY: Expose ctx for debugging
+  isDrawingState: () => isDrawing.value // TEMPORARY: Expose isDrawing state for debugging
 });
 
 watch(() => props.isEraserActive, (newValue) => {
