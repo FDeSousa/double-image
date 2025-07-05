@@ -13,9 +13,10 @@
 </template>
 
 <script setup>
+const { defineProps, defineEmits, defineExpose } = require('vue'); // For testing purposes
+// Import necessary Vue functions and components
 import { ref, onMounted, onUnmounted, watch } from 'vue';
 
-// eslint-disable-next-line no-undef
 const props = defineProps({
   templateSrc: String,
   stage: String, 
@@ -26,7 +27,6 @@ const props = defineProps({
   }
 });
 
-// eslint-disable-next-line no-undef
 const emit = defineEmits(['undo-state-changed']);
 
 const drawingCanvasRef = ref(null);
@@ -221,7 +221,6 @@ function clearDrawingCanvas() {
   }
 }
 
-// eslint-disable-next-line no-undef
 defineExpose({
   clearDrawingCanvas,
   getCanvasDataURL,

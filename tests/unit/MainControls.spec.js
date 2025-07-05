@@ -91,7 +91,7 @@ describe('MainControls.vue', () => {
     // Example: Target 25% of the track (clientX = 5 + 0.25 * 90 = 5 + 22.5 = 27.5)
     // Percent = (27.5-5)/90 = 22.5/90 = 0.25
     // Expected size = 1 + 0.25 * 9 = 1 + 2.25 = 3.25, rounded to 3
-    const moveEventData = { clientX: 27.5 };
+    //const moveEventData = { clientX: 27.5 };
     // Simulate mousemove on window (as per component logic)
     // For this, we might need to spy on window.addEventListener or mock it.
     // Or, directly call the component's mousemove handler if it's exposed or easily callable.
@@ -191,12 +191,6 @@ describe('MainControls.vue - Interactive Slider Drag Behavior', () => {
     // Track is from x=5 to x=95. clientX 10 -> relativeX 10.
     // percent = (10-5)/(95-5) = 5/90 = 0.055. Size = 1 + 0.055*9 = 1.495 -> 1
     
-    // Spy on the emit function
-    const emitSpy = jest.spyOn(wrapper, 'emitted'); // This spies on the record of emitted events
-                                                  // To spy on the actual emit call, we'd need to mock context.emit
-                                                  // For now, let's check the component's internal state change
-                                                  // or directly call the method and check its behavior.
-
     // Spy on the emit function
     // const emitSpy = jest.spyOn(wrapper, 'emitted'); // This spies on the record of emitted events
                                                   // To spy on the actual emit call, we'd need to mock context.emit

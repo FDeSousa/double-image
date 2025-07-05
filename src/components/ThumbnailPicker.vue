@@ -13,13 +13,12 @@
 </template>
 
 <script setup>
-// defineProps and defineEmits are compiler macros and do not need to be imported.
-// eslint-disable-next-line no-undef
+const { defineProps, defineEmits } = require('vue'); // For testing purposes
+
 defineProps({
   isVisible: Boolean
 });
 
-// eslint-disable-next-line no-undef
 const emit = defineEmits(['select-template']);
 
 const predefinedTemplateFiles = [

@@ -75,9 +75,9 @@
 </template>
 
 <script setup>
+const { defineProps, defineEmits, defineExpose } = require('vue'); // For testing purposes
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
 
-// eslint-disable-next-line no-undef
 const props = defineProps({
   currentStage: String,
   isEraserEnabled: Boolean,
@@ -90,7 +90,6 @@ const props = defineProps({
   currentTheme: String
 });
 
-// eslint-disable-next-line no-undef
 const emit = defineEmits([
   'toggle-thumbnails',
   'save-drawing-1',
@@ -322,7 +321,6 @@ watch(() => props.currentStage, async (newStage) => {
   }
 });
 
-// eslint-disable-next-line no-undef
 defineExpose({ isDraggingPreviewSize }); // Expose for testing
 </script>
 

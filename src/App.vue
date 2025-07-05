@@ -76,6 +76,8 @@
 </template>
 
 <script setup>
+const { defineExpose } = require('vue'); // For testing purposes
+// Import necessary components and utilities
 import { ref, onMounted, watch } from 'vue';
 import TopNavbar from './components/TopNavbar.vue'; 
 // import AppControls from './components/AppControls.vue'; // Removed
@@ -327,7 +329,6 @@ onMounted(() => {
   loadThemeFromLocalStorage();
 });
 
-// eslint-disable-next-line no-undef
 defineExpose({ // For testing purposes
   loadResultsFromLocalStorage,
   loadThemeFromLocalStorage,

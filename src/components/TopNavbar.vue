@@ -26,13 +26,13 @@
 </template>
 
 <script setup>
-// eslint-disable-next-line no-undef
+import { defineProps, defineEmits } from 'vue';
+
 const props = defineProps({
   currentTheme: String,
   canClearAll: Boolean
 });
 
-// eslint-disable-next-line no-undef
 const emit = defineEmits(['toggle-theme', 'clear-all-results']);
 </script>
 
