@@ -17,7 +17,7 @@ const mockDrawingCanvas = {
 
 const mockMainControls = {
   template: '<div class="mock-main-controls"></div>',
-  props: ['currentStage', 'isEraserEnabled', 'canUndo', 'canRedo', 'currentBrushSize', 'currentTheme']
+  props: ['currentStage', 'isEraserEnabled', 'canUndo', 'canRedo', 'currentBrushSize', 'currentTheme', 'isComparing']
 };
 
 const mockTopNavbar = {
@@ -41,6 +41,7 @@ jest.mock('@/utils/comparisonUtils.js', () => ({
     sim1vs2: 90, sim1vsT: 80, sim2vsT: 70,
     avgLikeness: 80, timeEfficiencyScore: 90, overallScore: 85,
   }),
+  calculateJaccardSimilarity: jest.fn().mockReturnValue(80.0),
   performResemblanceAnalysis: jest.fn().mockResolvedValue([
     { rawMisMatchPercentage: 10.0 },
     { rawMisMatchPercentage: 20.0 },

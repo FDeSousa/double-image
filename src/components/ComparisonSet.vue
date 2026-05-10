@@ -189,10 +189,10 @@ watch(() => props.resultSet, async () => {
 }
 .comparison-container canvas {
   border: 1px solid #eee;
-  width: 100%; /* Make canvas responsive within its container */
-  max-width: 200px; /* But don't let it get larger than original design */
-  height: 150px; /* Keep height fixed for now, or use aspect-ratio */
-  object-fit: contain; /* Ensure content scales nicely if canvas aspect ratio changes */
+  width: min(200px, 100%);
+  aspect-ratio: 4 / 3;
+  height: auto;
+  display: block;
   margin-bottom: 5px;
 }
 /* .diff-image {

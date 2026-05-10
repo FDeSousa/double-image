@@ -1,5 +1,9 @@
 <template>
   <div id="drawingArea">
+    <!-- Empty state when no template has been chosen yet -->
+    <div v-if="!templateSrc && stage === 'initial'" class="empty-state" aria-hidden="true">
+      <p>Pick a template above to start drawing</p>
+    </div>
     <img 
       id="templateImage" 
       v-if="templateSrc && props.stage !== 'compared'" 
@@ -8,14 +12,18 @@
       alt="Template Image" 
       style="opacity: 0.3;"
     >
-    <canvas id="drawingCanvas" ref="drawingCanvasRef"></canvas>
+    <canvas
+      id="drawingCanvas"
+      ref="drawingCanvasRef"
+      :aria-label="canvasAriaLabel"
+    ></canvas>
   </div>
 </template>
 
 <script setup>
 const { defineProps, defineEmits, defineExpose } = require('vue'); // For testing purposes
 // Import necessary Vue functions and components
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 
 const props = defineProps({
   templateSrc: String,
@@ -28,6 +36,15 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['undo-state-changed']);
+
+const canvasAriaLabel = computed(() => {
+  const labels = {
+    drawing1: 'Drawing canvas — draw your first image',
+    drawing2: 'Drawing canvas — draw your second image',
+    compared: 'Canvas showing combined drawings',
+  };
+  return labels[props.stage] || 'Drawing canvas';
+});
 
 const drawingCanvasRef = ref(null);
 let ctx = null;
@@ -326,7 +343,7 @@ async function displayCombinedDrawing(layers) {
   border: 1px solid black; 
   width: 100%; 
   max-width: 500px; 
-  height: 400px; 
+  aspect-ratio: 5 / 4;
   margin-left: auto;
   margin-right: auto;
   margin-bottom: 20px;
@@ -353,5 +370,21 @@ async function displayCombinedDrawing(layers) {
   cursor: crosshair;
   z-index: 2;
   touch-action: none;
+}
+
+.empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 0;
+}
+.empty-state p {
+  color: #aaa;
+  font-size: 1em;
+  text-align: center;
+  padding: 0 10px;
 }
 </style>

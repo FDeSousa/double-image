@@ -153,10 +153,11 @@ body.dark-mode .controls button:hover {
 
 #drawingArea {
     position: relative;
-    border: 1px solid var(--text-color-light); /* Use text color for border for theme consistency */
-    background-color: #ffffff; /* Ensure drawing area itself is white */
-    width: 500px; /* Example width */
-    height: 400px; /* Example height */
+    border: 1px solid var(--text-color-light);
+    background-color: #ffffff;
+    width: 100%;
+    max-width: 500px;
+    aspect-ratio: 5 / 4;
     margin-bottom: 20px;
 }
 

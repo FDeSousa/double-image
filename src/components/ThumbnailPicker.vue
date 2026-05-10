@@ -4,7 +4,12 @@
       v-for="templateFile in predefinedTemplateFiles" 
       :key="templateFile.filename" 
       class="thumbnail-item"
+      role="button"
+      tabindex="0"
+      :aria-label="`Select template: ${templateFile.name}`"
       @click="selectTemplate(templateFile.filename)"
+      @keydown.enter.prevent="selectTemplate(templateFile.filename)"
+      @keydown.space.prevent="selectTemplate(templateFile.filename)"
     >
       <img :src="`/template_images/${templateFile.filename}`" :alt="`Template: ${templateFile.name}`" class="template-thumbnail">
       <p class="thumbnail-name">{{ templateFile.name }}</p>

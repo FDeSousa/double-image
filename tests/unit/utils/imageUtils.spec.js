@@ -1,29 +1,23 @@
-import { urlToImageData } from '@/utils/imageUtils.js';
+import { urlToImageData, binariseImageData } from '@/utils/imageUtils.js';
 
-// Global Image mock is already in DrawingCanvas.spec.js,
-// but Jest runs tests in separate environments. So, we need it here too,
-// or move it to a Jest setup file. For now, let's redefine it.
 global.Image = class {
   constructor() {
-    // These will be reassigned by the code under test
     this.onload = null; 
     this.onerror = null;
-    this._src = ''; // Internal storage for src
+    this._src = '';
 
     Object.defineProperty(this, 'src', {
-      configurable: true, // Allow redefinition for tests if needed
+      configurable: true,
       set(value) {
         this._src = value;
-        // Simulate async loading
         process.nextTick(() => {
           if (value && value !== 'fail_load.png' && typeof this.onload === 'function') {
-            this.naturalWidth = 100; // Mock dimensions
+            this.naturalWidth = 100;
             this.naturalHeight = 100;
             this.onload();
           } else if (value === 'fail_load.png' && typeof this.onerror === 'function') {
             this.onerror(new Error('Mock image load error'));
           } else if (typeof this.onerror === 'function' && (!value || value === 'fail_load.png')) {
-            // If src is empty or still fail_load but no specific onerror for fail_load, call generic error
             this.onerror(new Error('Mock image load error for empty or unspecified fail src'));
           }
         });
@@ -35,11 +29,11 @@ global.Image = class {
   }
 };
 
-
-// Mock document.createElement('canvas')
 const mockCanvasContext = {
+  fillStyle: '',
+  fillRect: jest.fn(),
   drawImage: jest.fn(),
-  getImageData: jest.fn(() => ({ data: new Uint8ClampedArray([1,2,3,4]), width: 100, height: 100 })), // Dummy ImageData
+  getImageData: jest.fn(() => ({ data: new Uint8ClampedArray([255,255,255,255, 0,0,0,255]), width: 2, height: 1 })),
 };
 const mockCanvasElement = {
   getContext: jest.fn(() => mockCanvasContext),
@@ -56,35 +50,61 @@ global.document.createElement = jest.fn((elementName) => {
 
 describe('imageUtils.js', () => {
   beforeEach(() => {
-    // Reset mocks before each test
     jest.clearAllMocks();
-    // Reset properties on shared mock instances (if any were used, but Image is new each time)
-    // mockImageInstance.naturalWidth = 0; // Not needed if Image is a class creating new instances
-    // mockImageInstance.naturalHeight = 0;
-    // mockImageInstance.src = '';
     mockCanvasElement.width = 0;
     mockCanvasElement.height = 0;
   });
 
+  describe('binariseImageData', () => {
+    it('should turn bright pixels white and dark pixels black', () => {
+      const data = new Uint8ClampedArray([
+        200, 200, 200, 255, // luminance ~200 => dark => black
+        250, 250, 250, 255, // luminance 250 => bright => white
+        0,   0,   0,   255, // luminance 0 => black
+        255, 255, 255, 255, // luminance 255 => white
+      ]);
+      const imageData = { data };
+      binariseImageData(imageData, 240);
+      // pixel 0: 200 < 240 threshold => black
+      expect(data[0]).toBe(0); expect(data[1]).toBe(0); expect(data[2]).toBe(0);
+      // pixel 1: 250 > 240 => white
+      expect(data[4]).toBe(255); expect(data[5]).toBe(255); expect(data[6]).toBe(255);
+      // pixel 2: 0 < 240 => black
+      expect(data[8]).toBe(0);
+      // pixel 3: 255 > 240 => white
+      expect(data[12]).toBe(255);
+    });
+
+    it('should set alpha to fully opaque for all pixels', () => {
+      const data = new Uint8ClampedArray([100, 100, 100, 128]); // semi-transparent
+      const imageData = { data };
+      binariseImageData(imageData);
+      expect(data[3]).toBe(255);
+    });
+
+    it('should return the same ImageData object (mutates in place)', () => {
+      const imageData = { data: new Uint8ClampedArray(4) };
+      const result = binariseImageData(imageData);
+      expect(result).toBe(imageData);
+    });
+  });
+
   describe('urlToImageData', () => {
-    it('should resolve with ImageData on successful image load', async () => {
+    it('should resolve with binarised ImageData on successful image load', async () => {
       const testUrl = 'test.png';
       const targetWidth = 100;
       const targetHeight = 100;
       
       const imageData = await urlToImageData(testUrl, targetWidth, targetHeight);
 
-      // expect(global.Image).toHaveBeenCalledTimes(1); // global.Image is a class, not a jest.fn() spy itself
-      // We can infer Image was constructed if other parts of the chain work.
-      // For example, if drawImage was called, an image must have been "loaded".
       expect(document.createElement).toHaveBeenCalledWith('canvas');
       expect(mockCanvasElement.width).toBe(targetWidth);
       expect(mockCanvasElement.height).toBe(targetHeight);
       expect(mockCanvasElement.getContext).toHaveBeenCalledWith('2d');
+      expect(mockCanvasContext.fillRect).toHaveBeenCalledWith(0, 0, targetWidth, targetHeight);
       expect(mockCanvasContext.drawImage).toHaveBeenCalled();
       expect(mockCanvasContext.getImageData).toHaveBeenCalledWith(0, 0, targetWidth, targetHeight);
       expect(imageData).toBeDefined();
-      expect(imageData.width).toBe(100); // From mockCanvasContext.getImageData
     });
 
     it('should reject if URL is null or empty', async () => {
@@ -98,12 +118,11 @@ describe('imageUtils.js', () => {
     });
 
     it('should reject on image load error', async () => {
-      const errorUrl = 'fail_load.png'; // Special URL for our mock Image to trigger error
-      // The global.Image mock will call onerror for this src
+      const errorUrl = 'fail_load.png';
       await expect(urlToImageData(errorUrl, 100, 100)).rejects.toThrow(`Failed to load image: ${errorUrl}`);
     });
     
-    it('should reject if getContext returns null (though unlikely)', async () => {
+    it('should reject if getContext returns null', async () => {
       mockCanvasElement.getContext.mockReturnValueOnce(null);
       await expect(urlToImageData('test.png', 100, 100)).rejects.toThrow("Failed to get 2D context from temporary canvas.");
     });

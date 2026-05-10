@@ -9,17 +9,17 @@
 
     <!-- Stage: drawing1 -->
     <template v-if="props.currentStage === 'drawing1'">
-      <button id="save1Btn" @click="emit('save-drawing-1')">Save Drawing 1</button>
+      <button id="save1Btn" @click="emit('save-drawing-1')" title="Save your first drawing and prepare for drawing 2">Finish Drawing 1</button>
     </template>
 
     <!-- Stage: readyForDrawing2 -->
     <template v-if="props.currentStage === 'readyForDrawing2'">
-      <button id="start2Btn" @click="emit('start-drawing-2')">Start Drawing 2</button>
+      <button id="start2Btn" @click="emit('start-drawing-2')" title="Begin drawing the second version">Start Drawing 2</button>
     </template>
 
     <!-- Stage: drawing2 -->
     <template v-if="props.currentStage === 'drawing2'">
-      <button id="save2Btn" @click="emit('save-drawing-2')">Save & Compare</button>
+      <button id="save2Btn" @click="emit('save-drawing-2')" title="Save your second drawing and compare both">Finish Drawing 2</button>
     </template>
     
     <!-- Drawing Tools: visible during drawing1 or drawing2 -->
@@ -51,10 +51,12 @@
             <div class="brush-preview-wrapper" ref="previewWrapperRef" tabindex="0" 
                  @mousedown="handlePreviewMouseDown"
                  @touchstart.prevent="handlePreviewTouchStart"
+                 @keydown="handleSliderKeyDown"
                  aria-label="Brush size slider" role="slider"
                  :aria-valuenow="props.currentBrushSize"
                  :aria-valuemin="MIN_BRUSH_SIZE"
                  :aria-valuemax="MAX_BRUSH_SIZE"
+                 :aria-valuetext="`Brush size ${props.currentBrushSize}`"
             >
               <canvas ref="pestleBackgroundCanvas" width="100" height="50" class="pestle-bg"></canvas>
               <canvas ref="brushIndicatorCanvas" width="100" height="50" class="brush-indicator"></canvas>
@@ -70,7 +72,7 @@
       </div> 
     </template>
 
-    <button id="restartBtn" v-if="['drawing1', 'readyForDrawing2', 'drawing2', 'compared'].includes(props.currentStage) && props.currentStage !== 'initial'" @click="emit('restart-process')">Restart Pair</button>
+    <button id="restartBtn" v-if="['drawing1', 'readyForDrawing2', 'drawing2', 'compared'].includes(props.currentStage) && props.currentStage !== 'initial'" @click="confirmRestart" title="Discard current drawings and start a new pair">Start Over</button>
   </div>
 </template>
 
@@ -273,6 +275,25 @@ function handlePreviewTouchEnd() {
   }
 }
 
+function handleSliderKeyDown(event) {
+  let newSize = props.currentBrushSize;
+  if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+    newSize = Math.min(MAX_BRUSH_SIZE, props.currentBrushSize + 1);
+  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+    newSize = Math.max(MIN_BRUSH_SIZE, props.currentBrushSize - 1);
+  } else if (event.key === 'Home') {
+    newSize = MIN_BRUSH_SIZE;
+  } else if (event.key === 'End') {
+    newSize = MAX_BRUSH_SIZE;
+  } else {
+    return;
+  }
+  event.preventDefault();
+  if (newSize !== props.currentBrushSize) {
+    emit('set-brush-size', newSize);
+  }
+}
+
 function setupPreviewCanvases() {
   if (pestleBackgroundCanvas.value) {
     bgCtx = pestleBackgroundCanvas.value.getContext('2d'); 
@@ -320,6 +341,13 @@ watch(() => props.currentStage, async (newStage) => {
     setupPreviewCanvases(); 
   }
 });
+
+function confirmRestart() {
+  if (props.currentStage === 'drawing1' || props.currentStage === 'drawing2') {
+    if (!window.confirm('Start over? Your current drawing will be lost.')) return;
+  }
+  emit('restart-process');
+}
 
 defineExpose({ isDraggingPreviewSize }); // Expose for testing
 </script>
@@ -369,7 +397,7 @@ body.dark-mode .drawing-tools-super-group {
   padding: 8px 12px; 
   cursor: pointer;
   width: auto; 
-  min-width: 120px;
+  min-width: 0;
   height: 40px; 
   text-align: center;
   box-sizing: border-box;
@@ -381,8 +409,7 @@ body.dark-mode .drawing-tools-super-group {
   background-color: var(--button-bg-light);
   color: var(--button-text-light);
   border-radius: 4px;
-  flex-grow: 1; 
-  flex-basis: 120px; 
+  flex: 1 1 auto;
 }
 
 .primary-drawing-tools .tool-button.icon-only,

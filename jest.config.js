@@ -12,8 +12,9 @@ module.exports = {
   // Optional: If you have path aliases in vue.config.js (e.g., '@/*'), map them here
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^canvas$': '<rootDir>/tests/__mocks__/canvas.js',
   },
   testEnvironmentOptions: {
-    customExportConditions: ["node", "node-addons"],
+    customExportConditions: ["node"],
   },
 };
